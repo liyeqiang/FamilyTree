@@ -7,9 +7,7 @@ Individuals (个人信息表)
 | 列名             | 数据类型       | 约束                      | 描述                                   |
 | ---------------- | -------------- | ------------------------- | -------------------------------------- |
 | individual_id   | INT            | PRIMARY KEY, AUTO_INCREMENT | 个人唯一标识符                           |
-| first_name      | VARCHAR(255)   | NOT NULL                  | 名                                       |
-| middle_name     | VARCHAR(255)   |                           | 中间名                                   |
-| last_name       | VARCHAR(255)   | NOT NULL                  | 姓                                       |
+| full_name      | VARCHAR(255)   | NOT NULL                  | 姓名                                       |
 | gender           | ENUM('男', '女', '其他', '未知') |                           | 性别                                     |
 | birth_date      | DATE           |                           | 出生日期                                 |
 | birth_place_id | INT            | FOREIGN KEY references Places(place_id) | 出生地点ID，关联地点表                     |
@@ -17,6 +15,9 @@ Individuals (个人信息表)
 | death_place_id | INT            | FOREIGN KEY references Places(place_id) | 死亡地点ID，关联地点表                     |
 | occupation       | VARCHAR(255)   |                           | 职业                                     |
 | notes            | TEXT           |                           | 备注信息                                 |
+| photo_url        | VARCHAR(255)   |                           | 照片链接
+| father_id        | INT            | REFERENCES Individuals(individual_id) ON DELETE SET NULL | 父亲            |
+| mother_id        | INT            | REFERENCES Individuals(individual_id) ON DELETE SET NULL | 母亲            |
 | created_at      | TIMESTAMP      | DEFAULT CURRENT_TIMESTAMP  | 创建时间                                 |
 | updated_at      | TIMESTAMP      | DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP | 更新时间                                 |
 
