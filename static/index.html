@@ -555,6 +555,8 @@
     <div class="context-menu" id="contextMenu">
         <div class="context-menu-item" onclick="showAddChildModal()">👶 添加子女</div>
         <div class="context-menu-item" onclick="showAddSpouseModal()">💑 添加配偶</div>
+        <div class="context-menu-item" onclick="showAddFatherModal()">👨 添加父亲</div>
+        <div class="context-menu-item" onclick="showAddMotherModal()">👩 添加母亲</div>
         <div class="context-menu-item" onclick="showViewDetailsModal()">📋 查看详情</div>
         <div class="context-menu-item" onclick="editSelectedMember()">✏️ 编辑信息</div>
         <div class="context-menu-item danger" onclick="deleteSelectedMember()">🗑️ 删除成员</div>
@@ -1015,6 +1017,54 @@
             document.getElementById('contextMenu').style.display = 'none';
         }
 
+        // 显示添加父亲模态框
+        function showAddFatherModal() {
+            if (!contextMenuNode) return;
+            
+            const member = allMembers.find(m => m.individual_id === contextMenuNode);
+            if (!member) return;
+            
+            // 检查是否已有父亲
+            if (member.father_id) {
+                showNotification('该成员已有父亲信息', 'warning');
+                document.getElementById('contextMenu').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('modalTitle').textContent = '添加父亲';
+            document.getElementById('editingId').value = '';
+            document.getElementById('parentType').value = 'father';
+            document.getElementById('memberForm').reset();
+            // 默认设置为男性
+            document.getElementById('gender').value = 'male';
+            document.getElementById('memberModal').style.display = 'block';
+            document.getElementById('contextMenu').style.display = 'none';
+        }
+
+        // 显示添加母亲模态框
+        function showAddMotherModal() {
+            if (!contextMenuNode) return;
+            
+            const member = allMembers.find(m => m.individual_id === contextMenuNode);
+            if (!member) return;
+            
+            // 检查是否已有母亲
+            if (member.mother_id) {
+                showNotification('该成员已有母亲信息', 'warning');
+                document.getElementById('contextMenu').style.display = 'none';
+                return;
+            }
+            
+            document.getElementById('modalTitle').textContent = '添加母亲';
+            document.getElementById('editingId').value = '';
+            document.getElementById('parentType').value = 'mother';
+            document.getElementById('memberForm').reset();
+            // 默认设置为女性
+            document.getElementById('gender').value = 'female';
+            document.getElementById('memberModal').style.display = 'block';
+            document.getElementById('contextMenu').style.display = 'none';
+        }
+
         // 显示查看详情模态框
         function showViewDetailsModal() {
             if (!contextMenuNode) return;
@@ -1198,6 +1248,100 @@
                         }
                         
                         console.log('添加子女 - 最终表单数据:', formData);
+                    } else if (parentType === 'father' && contextMenuNode) {
+                        // 添加父亲：创建父亲后更新子女的father_id
+                        console.log('添加父亲 - 子女ID:', contextMenuNode);
+                        
+                        // 先创建父亲
+                        const createResponse = await fetch('/api/v1/individuals', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(formData)
+                        });
+                        
+                        const createData = await createResponse.json();
+                        
+                        if (createData.success) {
+                            // 更新子女的father_id
+                            const childMember = allMembers.find(m => m.individual_id === contextMenuNode);
+                            const updateData = {
+                                ...childMember,
+                                father_id: createData.data.individual_id
+                            };
+                            
+                            const updateResponse = await fetch(`/api/v1/individuals/${contextMenuNode}`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify(updateData)
+                            });
+                            
+                            const updateResult = await updateResponse.json();
+                            
+                            if (updateResult.success) {
+                                showNotification('父亲添加成功', 'success');
+                                closeMemberModal();
+                                await loadAllMembers();
+                                showFamilyTree(currentRootId || contextMenuNode);
+                                return;
+                            } else {
+                                showNotification(updateResult.message || '更新父子关系失败', 'error');
+                                return;
+                            }
+                        } else {
+                            showNotification(createData.message || '父亲创建失败', 'error');
+                            return;
+                        }
+                    } else if (parentType === 'mother' && contextMenuNode) {
+                        // 添加母亲：创建母亲后更新子女的mother_id
+                        console.log('添加母亲 - 子女ID:', contextMenuNode);
+                        
+                        // 先创建母亲
+                        const createResponse = await fetch('/api/v1/individuals', {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                            },
+                            body: JSON.stringify(formData)
+                        });
+                        
+                        const createData = await createResponse.json();
+                        
+                        if (createData.success) {
+                            // 更新子女的mother_id
+                            const childMember = allMembers.find(m => m.individual_id === contextMenuNode);
+                            const updateData = {
+                                ...childMember,
+                                mother_id: createData.data.individual_id
+                            };
+                            
+                            const updateResponse = await fetch(`/api/v1/individuals/${contextMenuNode}`, {
+                                method: 'PUT',
+                                headers: {
+                                    'Content-Type': 'application/json',
+                                },
+                                body: JSON.stringify(updateData)
+                            });
+                            
+                            const updateResult = await updateResponse.json();
+                            
+                            if (updateResult.success) {
+                                showNotification('母亲添加成功', 'success');
+                                closeMemberModal();
+                                await loadAllMembers();
+                                showFamilyTree(currentRootId || contextMenuNode);
+                                return;
+                            } else {
+                                showNotification(updateResult.message || '更新母子关系失败', 'error');
+                                return;
+                            }
+                        } else {
+                            showNotification(createData.message || '母亲创建失败', 'error');
+                            return;
+                        }
                     }
                     
                     response = await fetch('/api/v1/individuals', {

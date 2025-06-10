@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -359,6 +363,12 @@ func runSQLiteMode() {
 	}
 	defer db.Close()
 
+	// 初始化数据库（创建表和示例数据）
+	err = initializeDatabase(db)
+	if err != nil {
+		log.Fatalf("初始化数据库失败: %v", err)
+	}
+
 	// 创建存储库
 	sqliteRepo := repository.NewSQLiteRepository(db)
 
@@ -631,4 +641,117 @@ func contains(s, substr string) bool {
 			   }
 			   return false
 		   }())
+}
+
+// initializeDatabase 初始化数据库（创建表和示例数据）
+func initializeDatabase(db *sql.DB) error {
+	// 读取SQL初始化脚本
+	sqlFile := filepath.Join("sql", "init.sql")
+	sqlContent, err := ioutil.ReadFile(sqlFile)
+	if err != nil {
+		return fmt.Errorf("读取SQL文件失败: %v", err)
+	}
+
+	// 清理SQL内容，移除注释
+	lines := strings.Split(string(sqlContent), "\n")
+	var cleanLines []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "--") {
+			cleanLines = append(cleanLines, line)
+		}
+	}
+	cleanSQL := strings.Join(cleanLines, " ")
+
+	// 使用更智能的分割方法
+	statements := splitSQLStatements(cleanSQL)
+	
+	for i, stmt := range statements {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
+
+		fmt.Printf("执行SQL语句 %d: %s...\n", i+1, truncateString(stmt, 50))
+		_, err := db.Exec(stmt)
+		if err != nil {
+			return fmt.Errorf("执行SQL语句失败 '%s': %v", truncateString(stmt, 100), err)
+		}
+	}
+
+	fmt.Println("✅ 数据库初始化完成")
+	return nil
+}
+
+// splitSQLStatements 智能分割SQL语句
+func splitSQLStatements(sql string) []string {
+	var statements []string
+	var current strings.Builder
+	inString := false
+	var stringChar byte
+	beginEndLevel := 0
+	
+	// 将SQL转换为upper case来检测关键字
+	upperSQL := strings.ToUpper(sql)
+	
+	for i := 0; i < len(sql); i++ {
+		char := sql[i]
+		
+		// 处理字符串
+		if (char == '\'' || char == '"') && (i == 0 || sql[i-1] != '\\') {
+			if !inString {
+				inString = true
+				stringChar = char
+			} else if char == stringChar {
+				inString = false
+			}
+		}
+		
+		// 检测BEGIN关键字
+		if !inString && i <= len(upperSQL)-5 {
+			if upperSQL[i:i+5] == "BEGIN" && (i == 0 || !isAlphaNumeric(upperSQL[i-1])) && (i+5 >= len(upperSQL) || !isAlphaNumeric(upperSQL[i+5])) {
+				beginEndLevel++
+			}
+		}
+		
+		// 检测END关键字
+		if !inString && i <= len(upperSQL)-3 {
+			if upperSQL[i:i+3] == "END" && (i == 0 || !isAlphaNumeric(upperSQL[i-1])) && (i+3 >= len(upperSQL) || !isAlphaNumeric(upperSQL[i+3])) {
+				beginEndLevel--
+			}
+		}
+		
+		// 如果遇到分号且不在字符串中且不在BEGIN...END块中
+		if char == ';' && !inString && beginEndLevel == 0 {
+			stmt := strings.TrimSpace(current.String())
+			if stmt != "" {
+				statements = append(statements, stmt)
+			}
+			current.Reset()
+			continue
+		}
+		
+		current.WriteByte(char)
+	}
+	
+	// 添加最后一个语句
+	stmt := strings.TrimSpace(current.String())
+	if stmt != "" {
+		statements = append(statements, stmt)
+	}
+	
+	return statements
+}
+
+// isAlphaNumeric 检查字符是否为字母或数字
+func isAlphaNumeric(c byte) bool {
+	return (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'
+}
+
+// truncateString 截断字符串用于显示
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 } 
