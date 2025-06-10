@@ -455,4 +455,211 @@ func (r *SQLiteRepository) BuildFamilyTree(ctx context.Context, rootID int, gene
 	}
 	
 	return node, nil
+}
+
+// Family相关方法
+
+// CreateFamily 创建家庭关系
+func (r *SQLiteRepository) CreateFamily(ctx context.Context, family *models.Family) (*models.Family, error) {
+	query := `
+		INSERT INTO families (husband_id, wife_id, marriage_date, marriage_place_id, divorce_date, notes)
+		VALUES (?, ?, ?, ?, ?, ?)
+	`
+	
+	result, err := r.db.ExecContext(ctx, query,
+		family.HusbandID, family.WifeID, family.MarriageDate,
+		family.MarriagePlaceID, family.DivorceDate, family.Notes)
+	
+	if err != nil {
+		return nil, fmt.Errorf("创建家庭关系失败: %v", err)
+	}
+	
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("获取新插入ID失败: %v", err)
+	}
+	
+	family.FamilyID = int(id)
+	family.CreatedAt = time.Now()
+	family.UpdatedAt = time.Now()
+	
+	return family, nil
+}
+
+// GetFamilyByID 根据ID获取家庭关系
+func (r *SQLiteRepository) GetFamilyByID(ctx context.Context, id int) (*models.Family, error) {
+	query := `
+		SELECT family_id, husband_id, wife_id, marriage_date, marriage_place_id, 
+		divorce_date, notes, created_at, updated_at
+		FROM families WHERE family_id = ?
+	`
+	
+	var family models.Family
+	row := r.db.QueryRowContext(ctx, query, id)
+	
+	err := row.Scan(
+		&family.FamilyID, &family.HusbandID, &family.WifeID,
+		&family.MarriageDate, &family.MarriagePlaceID, &family.DivorceDate,
+		&family.Notes, &family.CreatedAt, &family.UpdatedAt)
+	
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, fmt.Errorf("家庭关系不存在")
+		}
+		return nil, fmt.Errorf("查询家庭关系失败: %v", err)
+	}
+	
+	return &family, nil
+}
+
+// UpdateFamily 更新家庭关系
+func (r *SQLiteRepository) UpdateFamily(ctx context.Context, id int, family *models.Family) (*models.Family, error) {
+	query := `
+		UPDATE families SET 
+		husband_id = ?, wife_id = ?, marriage_date = ?, marriage_place_id = ?, 
+		divorce_date = ?, notes = ?, updated_at = CURRENT_TIMESTAMP
+		WHERE family_id = ?
+	`
+	
+	_, err := r.db.ExecContext(ctx, query,
+		family.HusbandID, family.WifeID, family.MarriageDate,
+		family.MarriagePlaceID, family.DivorceDate, family.Notes, id)
+	
+	if err != nil {
+		return nil, fmt.Errorf("更新家庭关系失败: %v", err)
+	}
+	
+	return r.GetFamilyByID(ctx, id)
+}
+
+// DeleteFamily 删除家庭关系
+func (r *SQLiteRepository) DeleteFamily(ctx context.Context, id int) error {
+	query := `DELETE FROM families WHERE family_id = ?`
+	
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("删除家庭关系失败: %v", err)
+	}
+	
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("获取影响行数失败: %v", err)
+	}
+	
+	if affected == 0 {
+		return fmt.Errorf("家庭关系不存在")
+	}
+	
+	return nil
+}
+
+// GetFamiliesByIndividualID 获取某人参与的所有家庭关系
+func (r *SQLiteRepository) GetFamiliesByIndividualID(ctx context.Context, individualID int) ([]models.Family, error) {
+	query := `
+		SELECT family_id, husband_id, wife_id, marriage_date, marriage_place_id, 
+		divorce_date, notes, created_at, updated_at
+		FROM families WHERE husband_id = ? OR wife_id = ?
+		ORDER BY created_at
+	`
+	
+	rows, err := r.db.QueryContext(ctx, query, individualID, individualID)
+	if err != nil {
+		return nil, fmt.Errorf("查询家庭关系失败: %v", err)
+	}
+	defer rows.Close()
+	
+	var families []models.Family
+	for rows.Next() {
+		var family models.Family
+		err := rows.Scan(
+			&family.FamilyID, &family.HusbandID, &family.WifeID,
+			&family.MarriageDate, &family.MarriagePlaceID, &family.DivorceDate,
+			&family.Notes, &family.CreatedAt, &family.UpdatedAt)
+		
+		if err != nil {
+			return nil, fmt.Errorf("扫描家庭关系失败: %v", err)
+		}
+		
+		families = append(families, family)
+	}
+	
+	return families, nil
+}
+
+// CreateChild 创建子女关系
+func (r *SQLiteRepository) CreateChild(ctx context.Context, child *models.Child) (*models.Child, error) {
+	query := `
+		INSERT INTO children (family_id, individual_id, relationship_to_parents)
+		VALUES (?, ?, ?)
+	`
+	
+	result, err := r.db.ExecContext(ctx, query,
+		child.FamilyID, child.IndividualID, child.RelationshipToParents)
+	
+	if err != nil {
+		return nil, fmt.Errorf("创建子女关系失败: %v", err)
+	}
+	
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, fmt.Errorf("获取新插入ID失败: %v", err)
+	}
+	
+	child.ChildID = int(id)
+	child.CreatedAt = time.Now()
+	child.UpdatedAt = time.Now()
+	
+	return child, nil
+}
+
+// DeleteChild 删除子女关系
+func (r *SQLiteRepository) DeleteChild(ctx context.Context, familyID, individualID int) error {
+	query := `DELETE FROM children WHERE family_id = ? AND individual_id = ?`
+	
+	result, err := r.db.ExecContext(ctx, query, familyID, individualID)
+	if err != nil {
+		return fmt.Errorf("删除子女关系失败: %v", err)
+	}
+	
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("获取影响行数失败: %v", err)
+	}
+	
+	if affected == 0 {
+		return fmt.Errorf("子女关系不存在")
+	}
+	
+	return nil
+}
+
+// GetChildrenByFamilyID 获取家庭的所有子女
+func (r *SQLiteRepository) GetChildrenByFamilyID(ctx context.Context, familyID int) ([]models.Child, error) {
+	query := `
+		SELECT child_id, family_id, individual_id, relationship_to_parents, created_at, updated_at
+		FROM children WHERE family_id = ?
+		ORDER BY created_at
+	`
+	
+	rows, err := r.db.QueryContext(ctx, query, familyID)
+	if err != nil {
+		return nil, fmt.Errorf("查询子女关系失败: %v", err)
+	}
+	defer rows.Close()
+	
+	var children []models.Child
+	for rows.Next() {
+		var child models.Child
+		err := rows.Scan(
+			&child.ChildID, &child.FamilyID, &child.IndividualID,
+			&child.RelationshipToParents, &child.CreatedAt, &child.UpdatedAt)
+		
+		if err != nil {
+			return nil, fmt.Errorf("扫描子女关系失败: %v", err)
+		}
+		
+		children = append(children, child)
+	}
+	
+	return children, nil
 } 

@@ -20,23 +20,48 @@ func NewIndividualHandler(service interfaces.IndividualService) *IndividualHandl
 	return &IndividualHandler{service: service}
 }
 
+// APIResponse 统一API响应格式
+type APIResponse struct {
+	Success bool        `json:"success"`
+	Data    interface{} `json:"data,omitempty"`
+	Message string      `json:"message,omitempty"`
+	Total   *int        `json:"total,omitempty"`
+	Limit   *int        `json:"limit,omitempty"`
+	Offset  *int        `json:"offset,omitempty"`
+}
+
+// respondJSON 统一JSON响应
+func respondJSON(w http.ResponseWriter, status int, response APIResponse) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(response)
+}
+
 // CreateIndividual 创建个人信息
 func (h *IndividualHandler) CreateIndividual(w http.ResponseWriter, r *http.Request) {
 	var req models.CreateIndividualRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "无效的请求数据", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的请求数据",
+		})
 		return
 	}
 
 	individual, err := h.service.Create(r.Context(), &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(individual)
+	respondJSON(w, http.StatusCreated, APIResponse{
+		Success: true,
+		Data:    individual,
+		Message: "创建成功",
+	})
 }
 
 // GetIndividual 获取个人信息
@@ -44,18 +69,26 @@ func (h *IndividualHandler) GetIndividual(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "无效的ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的ID",
+		})
 		return
 	}
 
 	individual, err := h.service.GetByID(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		respondJSON(w, http.StatusNotFound, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(individual)
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    individual,
+	})
 }
 
 // UpdateIndividual 更新个人信息
@@ -63,24 +96,36 @@ func (h *IndividualHandler) UpdateIndividual(w http.ResponseWriter, r *http.Requ
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "无效的ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的ID",
+		})
 		return
 	}
 
 	var req models.UpdateIndividualRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, "无效的请求数据", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的请求数据",
+		})
 		return
 	}
 
 	individual, err := h.service.Update(r.Context(), id, &req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(individual)
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    individual,
+		Message: "更新成功",
+	})
 }
 
 // DeleteIndividual 删除个人信息
@@ -88,21 +133,35 @@ func (h *IndividualHandler) DeleteIndividual(w http.ResponseWriter, r *http.Requ
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "无效的ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的ID",
+		})
 		return
 	}
 
 	if err := h.service.Delete(r.Context(), id); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: "删除成功",
+	})
 }
 
 // SearchIndividuals 搜索个人信息
 func (h *IndividualHandler) SearchIndividuals(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query().Get("q")
+	// 同时支持q和query参数
+	query := r.URL.Query().Get("query")
+	if query == "" {
+		query = r.URL.Query().Get("q")
+	}
+	
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
 
@@ -122,19 +181,20 @@ func (h *IndividualHandler) SearchIndividuals(w http.ResponseWriter, r *http.Req
 
 	individuals, total, err := h.service.Search(r.Context(), query, limit, offset)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
-	response := map[string]interface{}{
-		"data":   individuals,
-		"total":  total,
-		"limit":  limit,
-		"offset": offset,
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    individuals,
+		Total:   &total,
+		Limit:   &limit,
+		Offset:  &offset,
+	})
 }
 
 // GetChildren 获取个人的子女
@@ -142,18 +202,26 @@ func (h *IndividualHandler) GetChildren(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "无效的ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的ID",
+		})
 		return
 	}
 
 	children, err := h.service.GetChildren(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(children)
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    children,
+	})
 }
 
 // GetParents 获取个人的父母
@@ -161,23 +229,35 @@ func (h *IndividualHandler) GetParents(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "无效的ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的ID",
+		})
 		return
 	}
 
 	father, mother, err := h.service.GetParents(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
-	response := map[string]interface{}{
-		"father": father,
-		"mother": mother,
+	// 组装父母数据为数组
+	var parents []models.Individual
+	if father != nil {
+		parents = append(parents, *father)
+	}
+	if mother != nil {
+		parents = append(parents, *mother)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    parents,
+	})
 }
 
 // GetSiblings 获取个人的兄弟姐妹
@@ -185,18 +265,26 @@ func (h *IndividualHandler) GetSiblings(w http.ResponseWriter, r *http.Request) 
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "无效的ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的ID",
+		})
 		return
 	}
 
 	siblings, err := h.service.GetSiblings(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(siblings)
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    siblings,
+	})
 }
 
 // GetSpouses 获取个人的配偶
@@ -204,18 +292,26 @@ func (h *IndividualHandler) GetSpouses(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "无效的ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的ID",
+		})
 		return
 	}
 
 	spouses, err := h.service.GetSpouses(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(spouses)
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    spouses,
+	})
 }
 
 // GetAncestors 获取个人的祖先
@@ -223,7 +319,10 @@ func (h *IndividualHandler) GetAncestors(w http.ResponseWriter, r *http.Request)
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "无效的ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的ID",
+		})
 		return
 	}
 
@@ -237,12 +336,17 @@ func (h *IndividualHandler) GetAncestors(w http.ResponseWriter, r *http.Request)
 
 	ancestors, err := h.service.GetAncestors(r.Context(), id, generations)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(ancestors)
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    ancestors,
+	})
 }
 
 // GetDescendants 获取个人的后代
@@ -250,7 +354,10 @@ func (h *IndividualHandler) GetDescendants(w http.ResponseWriter, r *http.Reques
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "无效的ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的ID",
+		})
 		return
 	}
 
@@ -264,12 +371,17 @@ func (h *IndividualHandler) GetDescendants(w http.ResponseWriter, r *http.Reques
 
 	descendants, err := h.service.GetDescendants(r.Context(), id, generations)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(descendants)
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    descendants,
+	})
 }
 
 // GetFamilyTree 获取家族树
@@ -277,7 +389,10 @@ func (h *IndividualHandler) GetFamilyTree(w http.ResponseWriter, r *http.Request
 	vars := mux.Vars(r)
 	id, err := strconv.Atoi(vars["id"])
 	if err != nil {
-		http.Error(w, "无效的ID", http.StatusBadRequest)
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的ID",
+		})
 		return
 	}
 
@@ -291,10 +406,15 @@ func (h *IndividualHandler) GetFamilyTree(w http.ResponseWriter, r *http.Request
 
 	tree, err := h.service.GetFamilyTree(r.Context(), id, generations)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(tree)
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    tree,
+	})
 } 

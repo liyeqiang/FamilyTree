@@ -47,7 +47,7 @@ type IndividualService interface {
 // FamilyService 家庭关系服务接口
 type FamilyService interface {
 	// 创建家庭关系
-	Create(ctx context.Context, req *models.CreateFamilyRequest) (*models.Family, error)
+	CreateFamily(ctx context.Context, req *models.CreateFamilyRequest) (*models.Family, error)
 	
 	// 根据ID获取家庭关系
 	GetByID(ctx context.Context, id int) (*models.Family, error)
@@ -63,6 +63,9 @@ type FamilyService interface {
 	
 	// 获取某人参与的所有家庭关系
 	GetByIndividualID(ctx context.Context, individualID int) ([]models.Family, error)
+	
+	// 添加配偶关系
+	AddSpouse(ctx context.Context, individualID, spouseID int) (*models.Family, error)
 	
 	// 为家庭添加子女
 	AddChild(ctx context.Context, familyID, childID int, relationship string) error
@@ -208,6 +211,7 @@ type IndividualRepository interface {
 	SearchIndividuals(ctx context.Context, query string, limit, offset int) ([]models.Individual, int, error)
 	GetIndividualsByParentID(ctx context.Context, parentID int) ([]models.Individual, error)
 	GetIndividualsByIDs(ctx context.Context, ids []int) ([]models.Individual, error)
+	GetSpouses(ctx context.Context, individualID int) ([]models.Individual, error)
 }
 
 // FamilyRepository 家庭关系数据访问接口

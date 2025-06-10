@@ -288,8 +288,8 @@ func (s *IndividualService) GetSpouses(ctx context.Context, id int) ([]models.In
 	if id <= 0 {
 		return nil, fmt.Errorf("无效的个人ID")
 	}
-	// 这里需要查询families表，暂时返回空
-	return []models.Individual{}, nil
+	
+	return s.repo.GetSpouses(ctx, id)
 }
 
 // GetAncestors 获取个人的所有祖先
@@ -389,8 +389,8 @@ func (s *IndividualService) GetFamilyTree(ctx context.Context, rootID int, gener
 	if generations <= 0 {
 		generations = 3 // 默认3代
 	}
-	if generations > 5 {
-		generations = 5 // 最多5代
+	if generations > 10 {
+		generations = 10 // 最多10代，防止无限递归
 	}
 
 	individual, err := s.repo.GetIndividualByID(ctx, rootID)

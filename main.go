@@ -23,33 +23,86 @@ import (
 // DemoRepository 内存存储库用于演示模式
 type DemoRepository struct {
 	individuals []models.Individual
+	families    []models.Family
+	children    []models.Child
 	nextID      int
+	nextFamilyID int
+	nextChildID  int
 }
 
 func NewDemoRepository() *DemoRepository {
 	repo := &DemoRepository{
 		individuals: make([]models.Individual, 0),
+		families:    make([]models.Family, 0),
+		children:    make([]models.Child, 0),
 		nextID:      1,
+		nextFamilyID: 1,
+		nextChildID:  1,
 	}
 	
-	// 添加示例数据
+	// 添加示例数据 - 6代完整家族
 	now := time.Now()
+	birthDate1920 := time.Date(1920, 1, 15, 0, 0, 0, 0, time.UTC)
+	birthDate1925 := time.Date(1925, 3, 20, 0, 0, 0, 0, time.UTC)
 	birthDate1950 := time.Date(1950, 1, 15, 0, 0, 0, 0, time.UTC)
 	birthDate1955 := time.Date(1955, 3, 20, 0, 0, 0, 0, time.UTC)
 	birthDate1975 := time.Date(1975, 6, 10, 0, 0, 0, 0, time.UTC)
 	birthDate1978 := time.Date(1978, 9, 15, 0, 0, 0, 0, time.UTC)
 	birthDate2005 := time.Date(2005, 12, 25, 0, 0, 0, 0, time.UTC)
+	birthDate2008 := time.Date(2008, 5, 10, 0, 0, 0, 0, time.UTC)
+	birthDate2030 := time.Date(2030, 8, 15, 0, 0, 0, 0, time.UTC)
+	birthDate2032 := time.Date(2032, 11, 20, 0, 0, 0, 0, time.UTC)
+	birthDate2055 := time.Date(2055, 2, 28, 0, 0, 0, 0, time.UTC)
 	
 	individuals := []models.Individual{
-		{IndividualID: 1, FullName: "张伟", Gender: models.GenderMale, BirthDate: &birthDate1950, Occupation: "工程师", Notes: "家族族长", CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 2, FullName: "李丽", Gender: models.GenderFemale, BirthDate: &birthDate1955, Occupation: "教师", Notes: "张伟的妻子", CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 3, FullName: "张明", Gender: models.GenderMale, BirthDate: &birthDate1975, Occupation: "医生", Notes: "张伟和李丽的儿子", FatherID: &[]int{1}[0], MotherID: &[]int{2}[0], CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 4, FullName: "王美", Gender: models.GenderFemale, BirthDate: &birthDate1978, Occupation: "护士", Notes: "张明的妻子", CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 5, FullName: "张小宝", Gender: models.GenderMale, BirthDate: &birthDate2005, Occupation: "", Notes: "张明和王美的儿子", FatherID: &[]int{3}[0], MotherID: &[]int{4}[0], CreatedAt: now, UpdatedAt: now},
+		// 第1代（祖父母）
+		{IndividualID: 1, FullName: "张老爷子", Gender: models.GenderMale, BirthDate: &birthDate1920, BirthPlace: "山东省济南市", Occupation: "农民", Notes: "家族始祖", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 2, FullName: "李老太太", Gender: models.GenderFemale, BirthDate: &birthDate1925, BirthPlace: "河北省石家庄市", Occupation: "家庭主妇", Notes: "张老爷子的妻子", CreatedAt: now, UpdatedAt: now},
+		
+		// 第2代（父母）
+		{IndividualID: 3, FullName: "张伟", Gender: models.GenderMale, BirthDate: &birthDate1950, BirthPlace: "北京市朝阳区", Occupation: "工程师", Notes: "张老爷子和李老太太的儿子", FatherID: &[]int{1}[0], MotherID: &[]int{2}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 4, FullName: "王丽", Gender: models.GenderFemale, BirthDate: &birthDate1955, BirthPlace: "上海市黄浦区", Occupation: "教师", Notes: "张伟的妻子", CreatedAt: now, UpdatedAt: now},
+		
+		// 第3代（本人一代）
+		{IndividualID: 5, FullName: "张明", Gender: models.GenderMale, BirthDate: &birthDate1975, BirthPlace: "北京市海淀区", Occupation: "医生", Notes: "张伟和王丽的儿子", FatherID: &[]int{3}[0], MotherID: &[]int{4}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 6, FullName: "李美", Gender: models.GenderFemale, BirthDate: &birthDate1978, BirthPlace: "天津市和平区", Occupation: "护士", Notes: "张明的妻子", CreatedAt: now, UpdatedAt: now},
+		
+		// 第4代（子女）
+		{IndividualID: 7, FullName: "张小宝", Gender: models.GenderMale, BirthDate: &birthDate2005, BirthPlace: "北京市西城区", Occupation: "学生", Notes: "张明和李美的儿子", FatherID: &[]int{5}[0], MotherID: &[]int{6}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 8, FullName: "赵小花", Gender: models.GenderFemale, BirthDate: &birthDate2008, BirthPlace: "广州市天河区", Occupation: "学生", Notes: "张小宝的女友", CreatedAt: now, UpdatedAt: now},
+		
+		// 第5代（孙子女）
+		{IndividualID: 9, FullName: "张小小", Gender: models.GenderMale, BirthDate: &birthDate2030, BirthPlace: "深圳市南山区", Occupation: "程序员", Notes: "张小宝和赵小花的儿子", FatherID: &[]int{7}[0], MotherID: &[]int{8}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 10, FullName: "陈小雅", Gender: models.GenderFemale, BirthDate: &birthDate2032, BirthPlace: "杭州市西湖区", Occupation: "设计师", Notes: "张小小的妻子", CreatedAt: now, UpdatedAt: now},
+		
+		// 第6代（曾孙）
+		{IndividualID: 11, FullName: "张宝宝", Gender: models.GenderMale, BirthDate: &birthDate2055, BirthPlace: "上海市浦东新区", Occupation: "", Notes: "张小小和陈小雅的儿子", FatherID: &[]int{9}[0], MotherID: &[]int{10}[0], CreatedAt: now, UpdatedAt: now},
 	}
 	
 	repo.individuals = individuals
-	repo.nextID = 6
+	repo.nextID = 12
+	
+	// 添加示例家庭数据 - 6代家族的配偶关系
+	families := []models.Family{
+		{FamilyID: 1, HusbandID: &[]int{1}[0], WifeID: &[]int{2}[0], Notes: "张老爷子和李老太太的家庭", CreatedAt: now, UpdatedAt: now},
+		{FamilyID: 2, HusbandID: &[]int{3}[0], WifeID: &[]int{4}[0], Notes: "张伟和王丽的家庭", CreatedAt: now, UpdatedAt: now},
+		{FamilyID: 3, HusbandID: &[]int{5}[0], WifeID: &[]int{6}[0], Notes: "张明和李美的家庭", CreatedAt: now, UpdatedAt: now},
+		{FamilyID: 4, HusbandID: &[]int{7}[0], WifeID: &[]int{8}[0], Notes: "张小宝和赵小花的家庭", CreatedAt: now, UpdatedAt: now},
+		{FamilyID: 5, HusbandID: &[]int{9}[0], WifeID: &[]int{10}[0], Notes: "张小小和陈小雅的家庭", CreatedAt: now, UpdatedAt: now},
+	}
+	repo.families = families
+	repo.nextFamilyID = 6
+	
+	// 添加示例子女关系数据 - 6代家族的父子关系
+	childrenData := []models.Child{
+		{ChildID: 1, FamilyID: 1, IndividualID: 3, RelationshipToParents: "生子", CreatedAt: now, UpdatedAt: now},
+		{ChildID: 2, FamilyID: 2, IndividualID: 5, RelationshipToParents: "生子", CreatedAt: now, UpdatedAt: now},
+		{ChildID: 3, FamilyID: 3, IndividualID: 7, RelationshipToParents: "生子", CreatedAt: now, UpdatedAt: now},
+		{ChildID: 4, FamilyID: 4, IndividualID: 9, RelationshipToParents: "生子", CreatedAt: now, UpdatedAt: now},
+		{ChildID: 5, FamilyID: 5, IndividualID: 11, RelationshipToParents: "生子", CreatedAt: now, UpdatedAt: now},
+	}
+	repo.children = childrenData
+	repo.nextChildID = 6
 	
 	return repo
 }
@@ -145,6 +198,113 @@ func (r *DemoRepository) GetIndividualsByIDs(ctx context.Context, ids []int) ([]
 	return results, nil
 }
 
+func (r *DemoRepository) GetSpouses(ctx context.Context, individualID int) ([]models.Individual, error) {
+	var spouses []models.Individual
+	
+	// 根据families数据查找配偶
+	for _, family := range r.families {
+		var spouseID *int
+		if family.HusbandID != nil && *family.HusbandID == individualID && family.WifeID != nil {
+			spouseID = family.WifeID
+		} else if family.WifeID != nil && *family.WifeID == individualID && family.HusbandID != nil {
+			spouseID = family.HusbandID
+		}
+		
+		if spouseID != nil {
+			spouse, err := r.GetIndividualByID(ctx, *spouseID)
+			if err == nil {
+				spouses = append(spouses, *spouse)
+			}
+		}
+	}
+	
+	return spouses, nil
+}
+
+// DemoRepository 实现 FamilyRepository 接口
+func (r *DemoRepository) CreateFamily(ctx context.Context, family *models.Family) (*models.Family, error) {
+	family.FamilyID = r.nextFamilyID
+	family.CreatedAt = time.Now()
+	family.UpdatedAt = time.Now()
+	r.nextFamilyID++
+	
+	r.families = append(r.families, *family)
+	return family, nil
+}
+
+func (r *DemoRepository) GetFamilyByID(ctx context.Context, id int) (*models.Family, error) {
+	for _, family := range r.families {
+		if family.FamilyID == id {
+			return &family, nil
+		}
+	}
+	return nil, fmt.Errorf("家庭关系不存在")
+}
+
+func (r *DemoRepository) UpdateFamily(ctx context.Context, id int, family *models.Family) (*models.Family, error) {
+	for i, existing := range r.families {
+		if existing.FamilyID == id {
+			family.FamilyID = id
+			family.CreatedAt = existing.CreatedAt
+			family.UpdatedAt = time.Now()
+			r.families[i] = *family
+			return family, nil
+		}
+	}
+	return nil, fmt.Errorf("家庭关系不存在")
+}
+
+func (r *DemoRepository) DeleteFamily(ctx context.Context, id int) error {
+	for i, family := range r.families {
+		if family.FamilyID == id {
+			r.families = append(r.families[:i], r.families[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("家庭关系不存在")
+}
+
+func (r *DemoRepository) GetFamiliesByIndividualID(ctx context.Context, individualID int) ([]models.Family, error) {
+	var families []models.Family
+	for _, family := range r.families {
+		if (family.HusbandID != nil && *family.HusbandID == individualID) ||
+		   (family.WifeID != nil && *family.WifeID == individualID) {
+			families = append(families, family)
+		}
+	}
+	return families, nil
+}
+
+func (r *DemoRepository) CreateChild(ctx context.Context, child *models.Child) (*models.Child, error) {
+	child.ChildID = r.nextChildID
+	child.CreatedAt = time.Now()
+	child.UpdatedAt = time.Now()
+	r.nextChildID++
+	
+	r.children = append(r.children, *child)
+	return child, nil
+}
+
+func (r *DemoRepository) DeleteChild(ctx context.Context, familyID, individualID int) error {
+	for i, child := range r.children {
+		if child.FamilyID == familyID && child.IndividualID == individualID {
+			r.children = append(r.children[:i], r.children[i+1:]...)
+			return nil
+		}
+	}
+	return fmt.Errorf("子女关系不存在")
+}
+
+func (r *DemoRepository) GetChildrenByFamilyID(ctx context.Context, familyID int) ([]models.Child, error) {
+	var children []models.Child
+	for _, child := range r.children {
+		if child.FamilyID == familyID {
+			children = append(children, child)
+		}
+	}
+	return children, nil
+}
+
 func main() {
 	// 检查命令行参数
 	mode := "demo"
@@ -172,12 +332,14 @@ func runDemoMode() {
 	// 创建演示存储库和服务
 	repo := NewDemoRepository()
 	individualService := services.NewIndividualService(repo)
+	familyService := services.NewFamilyService(repo, repo)
 
 	// 创建处理器
 	individualHandler := handlers.NewIndividualHandler(individualService)
+	familyHandler := handlers.NewFamilyHandler(familyService)
 
 	// 创建并配置路由器
-	router := setupRouter(individualHandler, "demo", "")
+	router := setupRouter(individualHandler, familyHandler, "demo", "")
 
 	// 启动服务器
 	startServer(router)
@@ -206,15 +368,19 @@ func runSQLiteMode() {
 	// 创建处理器
 	individualHandler := handlers.NewIndividualHandler(individualService)
 
+	// 创建家庭服务
+	familyService := services.NewFamilyService(sqliteRepo, sqliteRepo)
+	familyHandler := handlers.NewFamilyHandler(familyService)
+
 	// 创建并配置路由器
-	router := setupRouter(individualHandler, "sqlite", cfg.DBPath)
+	router := setupRouter(individualHandler, familyHandler, "sqlite", cfg.DBPath)
 
 	// 启动服务器
 	startServer(router)
 }
 
 // setupRouter 设置路由器
-func setupRouter(individualHandler *handlers.IndividualHandler, mode, dbPath string) *mux.Router {
+func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *handlers.FamilyHandler, mode, dbPath string) *mux.Router {
 	router := mux.NewRouter()
 
 	// API路由
@@ -236,6 +402,13 @@ func setupRouter(individualHandler *handlers.IndividualHandler, mode, dbPath str
 	individuals.HandleFunc("/{id:[0-9]+}/ancestors", individualHandler.GetAncestors).Methods("GET")
 	individuals.HandleFunc("/{id:[0-9]+}/descendants", individualHandler.GetDescendants).Methods("GET")
 	individuals.HandleFunc("/{id:[0-9]+}/family-tree", individualHandler.GetFamilyTree).Methods("GET")
+	
+	// 配偶关系路由
+	individuals.HandleFunc("/{id:[0-9]+}/add-spouse", familyHandler.AddSpouse).Methods("POST")
+	
+	// 家庭关系路由
+	families := api.PathPrefix("/families").Subrouter()
+	families.HandleFunc("", familyHandler.CreateFamily).Methods("POST")
 
 	// 健康检查
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
@@ -253,8 +426,21 @@ func setupRouter(individualHandler *handlers.IndividualHandler, mode, dbPath str
 		json.NewEncoder(w).Encode(response)
 	}).Methods("GET")
 
-	// 首页
+	// 静态文件服务
+	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
+
+	// UI管理界面
+	router.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/static/index.html", http.StatusFound)
+	}).Methods("GET")
+
+	// 首页 - 重定向到UI界面
 	router.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "/ui", http.StatusFound)
+	}).Methods("GET")
+
+	// API文档页面
+	router.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
 		
 		var pageTitle, modeInfo, modeDescription string
@@ -289,7 +475,7 @@ func setupRouter(individualHandler *handlers.IndividualHandler, mode, dbPath str
 		<!DOCTYPE html>
 		<html>
 		<head>
-			<title>%s</title>
+			<title>%s - API文档</title>
 			<meta charset="utf-8">
 			<style>
 				body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 40px; }
@@ -299,11 +485,15 @@ func setupRouter(individualHandler *handlers.IndividualHandler, mode, dbPath str
 				.endpoint a:hover { text-decoration: underline; }
 				.info { background: #e8f4fd; padding: 15px; border-radius: 8px; border-left: 4px solid #0066cc; margin: 20px 0; }
 				.mode-switch { background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffa500; margin: 20px 0; }
+				.ui-link { background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0; font-weight: bold; }
+				.ui-link:hover { background: #218838; color: white; }
 			</style>
 		</head>
 		<body>
 			<div class="container">
-				<h1>🌳 %s</h1>
+				<h1>🌳 %s - API文档</h1>
+				
+				<a href="/ui" class="ui-link">🖥️ 打开管理界面</a>
 				
 				%s
 

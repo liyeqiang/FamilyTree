@@ -9,10 +9,10 @@ import (
 type Gender string
 
 const (
-	GenderMale    Gender = "男"
-	GenderFemale  Gender = "女"
-	GenderOther   Gender = "其他"
-	GenderUnknown Gender = "未知"
+	GenderMale    Gender = "male"
+	GenderFemale  Gender = "female"
+	GenderOther   Gender = "other"
+	GenderUnknown Gender = "unknown"
 )
 
 // Scan 实现 sql.Scanner 接口
@@ -52,8 +52,11 @@ type Individual struct {
 	FullName       string    `json:"full_name" db:"full_name"`
 	Gender         Gender    `json:"gender" db:"gender"`
 	BirthDate      *time.Time `json:"birth_date" db:"birth_date"`
+	BirthPlace     string    `json:"birth_place" db:"birth_place"`           // 出生地点（文本）
 	BirthPlaceID   *int      `json:"birth_place_id" db:"birth_place_id"`
 	DeathDate      *time.Time `json:"death_date" db:"death_date"`
+	DeathPlace     string    `json:"death_place" db:"death_place"`           // 埋葬地点（文本）
+	BurialPlace    string    `json:"burial_place" db:"burial_place"`         // 埋葬地点（别名，兼容性）
 	DeathPlaceID   *int      `json:"death_place_id" db:"death_place_id"`
 	Occupation     string    `json:"occupation" db:"occupation"`
 	Notes          string    `json:"notes" db:"notes"`
@@ -64,8 +67,8 @@ type Individual struct {
 	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
 	
 	// 关联字段（非数据库字段）
-	BirthPlace     *Place      `json:"birth_place,omitempty" db:"-"`
-	DeathPlace     *Place      `json:"death_place,omitempty" db:"-"`
+	BirthPlaceObj  *Place      `json:"birth_place_obj,omitempty" db:"-"`
+	DeathPlaceObj  *Place      `json:"death_place_obj,omitempty" db:"-"`
 	Father         *Individual `json:"father,omitempty" db:"-"`
 	Mother         *Individual `json:"mother,omitempty" db:"-"`
 	Children       []Individual `json:"children,omitempty" db:"-"`
@@ -175,8 +178,11 @@ type CreateIndividualRequest struct {
 	FullName     string     `json:"full_name" binding:"required"`
 	Gender       Gender     `json:"gender"`
 	BirthDate    *time.Time `json:"birth_date"`
+	BirthPlace   string     `json:"birth_place"`    // 出生地点
 	BirthPlaceID *int       `json:"birth_place_id"`
 	DeathDate    *time.Time `json:"death_date"`
+	DeathPlace   string     `json:"death_place"`    // 埋葬地点
+	BurialPlace  string     `json:"burial_place"`   // 埋葬地点（别名）
 	DeathPlaceID *int       `json:"death_place_id"`
 	Occupation   string     `json:"occupation"`
 	Notes        string     `json:"notes"`
@@ -190,8 +196,11 @@ type UpdateIndividualRequest struct {
 	FullName     *string    `json:"full_name"`
 	Gender       *Gender    `json:"gender"`
 	BirthDate    *time.Time `json:"birth_date"`
+	BirthPlace   *string    `json:"birth_place"`    // 出生地点
 	BirthPlaceID *int       `json:"birth_place_id"`
 	DeathDate    *time.Time `json:"death_date"`
+	DeathPlace   *string    `json:"death_place"`    // 埋葬地点
+	BurialPlace  *string    `json:"burial_place"`   // 埋葬地点（别名）
 	DeathPlaceID *int       `json:"death_place_id"`
 	Occupation   *string    `json:"occupation"`
 	Notes        *string    `json:"notes"`

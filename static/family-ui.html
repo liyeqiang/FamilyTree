@@ -1,0 +1,1167 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>家族树管理系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            padding: 15px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo h1 {
+            color: #4CAF50;
+            font-size: 1.8em;
+            font-weight: 600;
+        }
+
+        .search-container {
+            flex: 1;
+            max-width: 400px;
+            margin: 0 30px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 12px 45px 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+            transition: all 0.3s;
+            background: white;
+        }
+
+        .search-input:focus {
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+
+        .search-btn {
+            position: absolute;
+            right: 5px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #4CAF50;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .search-btn:hover {
+            background: #45a049;
+        }
+
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.1);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 200;
+            display: none;
+        }
+
+        .search-result-item {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .search-result-item:hover {
+            background: #f8f9fa;
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .family-tree-main {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            min-height: 600px;
+        }
+
+        .tree-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .tree-title {
+            font-size: 1.5em;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .tree-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .generations-select {
+            padding: 8px 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            outline: none;
+            font-size: 14px;
+        }
+
+        .add-root-btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .add-root-btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .tree-container {
+            background: #fafafa;
+            border-radius: 10px;
+            padding: 30px;
+            overflow: auto;
+            min-height: 500px;
+            position: relative;
+        }
+
+        .tree-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 800px;
+            gap: 30px;
+        }
+
+        .tree-generation {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 30px;
+            position: relative;
+        }
+
+        .tree-node {
+            background: white;
+            border: 3px solid #4CAF50;
+            border-radius: 12px;
+            padding: 20px;
+            min-width: 180px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .tree-node:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+
+        .tree-node.selected {
+            background: #4CAF50;
+            color: white;
+            transform: scale(1.05);
+        }
+
+        .ancestor-node {
+            border-color: #607D8B;
+            background: #eceff1;
+        }
+
+        .root-node {
+            border-color: #2196F3;
+            background: #e3f2fd;
+            border-width: 4px;
+            transform: scale(1.1);
+        }
+
+        .spouse-node {
+            border-color: #E91E63;
+            background: #fce4ec;
+        }
+
+        .child-node {
+            border-color: #FF9800;
+            background: #fff3e0;
+        }
+
+        .descendant-node {
+            border-color: #9C27B0;
+            background: #f3e5f5;
+        }
+
+        .node-name {
+            font-size: 1.1em;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .node-details {
+            font-size: 0.85em;
+            color: #666;
+            margin: 5px 0;
+        }
+
+        .node-occupation {
+            font-size: 0.75em;
+            color: #888;
+            font-style: italic;
+        }
+
+        .marriage-connector {
+            display: flex;
+            align-items: center;
+            font-size: 2em;
+            margin: 0 15px;
+            color: #E91E63;
+        }
+
+        .tree-connector {
+            width: 3px;
+            height: 40px;
+            background: #4CAF50;
+            margin: 0 auto;
+        }
+
+        .context-menu {
+            position: fixed;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+            padding: 8px 0;
+            z-index: 1000;
+            display: none;
+            min-width: 180px;
+        }
+
+        .context-menu-item {
+            padding: 12px 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-size: 14px;
+        }
+
+        .context-menu-item:hover {
+            background: #f8f9fa;
+        }
+
+        .context-menu-item.danger:hover {
+            background: #ffebee;
+            color: #d32f2f;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .modal-title {
+            font-size: 1.3em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close:hover {
+            color: #333;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 14px;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 15px;
+            justify-content: flex-end;
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            z-index: 3000;
+            transform: translateX(400px);
+            opacity: 0;
+            transition: all 0.3s;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+            opacity: 1;
+        }
+
+        .notification.success {
+            background: #4CAF50;
+        }
+
+        .notification.error {
+            background: #f44336;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #666;
+        }
+
+        .empty-state-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            opacity: 0.5;
+        }
+
+        .empty-state-text {
+            font-size: 1.2em;
+            margin-bottom: 30px;
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .search-container {
+                margin: 0;
+                max-width: 100%;
+            }
+
+            .tree-controls {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .tree-node {
+                min-width: 150px;
+                padding: 15px;
+            }
+
+            .tree-generation {
+                gap: 20px;
+            }
+
+            .modal-content {
+                width: 95%;
+                margin: 10% auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 顶部导航栏 -->
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <h1>🌳 家族树</h1>
+            </div>
+            
+            <!-- 搜索框 -->
+            <div class="search-container">
+                <input type="text" class="search-input" id="searchInput" placeholder="搜索家族成员...">
+                <button class="search-btn" onclick="performSearch()">🔍</button>
+                <div class="search-results" id="searchResults"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主内容区域 -->
+    <div class="main-container">
+        <div class="family-tree-main">
+            <div class="tree-header">
+                <div class="tree-title">
+                    <span id="currentRootName">家族树</span>
+                    <span id="currentGenInfo" style="font-size: 0.7em; color: #666; margin-left: 10px;"></span>
+                </div>
+                <div class="tree-controls">
+                    <select id="generationsSelect" class="generations-select" onchange="changeGenerations()">
+                        <option value="3">显示3代</option>
+                        <option value="4">显示4代</option>
+                        <option value="5" selected>显示5代</option>
+                        <option value="6">显示6代</option>
+                    </select>
+                    <button class="add-root-btn" onclick="showAddModal()">+ 添加族长</button>
+                </div>
+            </div>
+            
+            <!-- 族谱显示区域 -->
+            <div class="tree-container" id="treeContainer">
+                <div class="empty-state">
+                    <div class="empty-state-icon">🌱</div>
+                    <div class="empty-state-text">开始构建您的家族树</div>
+                    <button class="btn btn-primary" onclick="showAddModal()">添加第一位成员</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 右键菜单 -->
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" onclick="showAddChildModal()">👶 添加子女</div>
+        <div class="context-menu-item" onclick="showAddSpouseModal()">💑 添加配偶</div>
+        <div class="context-menu-item" onclick="showViewDetailsModal()">📋 查看详情</div>
+        <div class="context-menu-item" onclick="editSelectedMember()">✏️ 编辑信息</div>
+        <div class="context-menu-item danger" onclick="deleteSelectedMember()">🗑️ 删除成员</div>
+    </div>
+
+    <!-- 添加/编辑成员模态框 -->
+    <div id="memberModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title" id="modalTitle">添加成员</div>
+                <span class="close" onclick="closeMemberModal()">&times;</span>
+            </div>
+            
+            <form id="memberForm">
+                <input type="hidden" id="editingId" value="">
+                <input type="hidden" id="parentType" value="">
+                
+                <div class="form-group">
+                    <label for="fullName">姓名 *</label>
+                    <input type="text" id="fullName" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="gender">性别 *</label>
+                    <select id="gender" required>
+                        <option value="">请选择性别</option>
+                        <option value="male">男</option>
+                        <option value="female">女</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label for="birthDate">出生日期</label>
+                    <input type="date" id="birthDate">
+                </div>
+                
+                <div class="form-group">
+                    <label for="deathDate">去世日期</label>
+                    <input type="date" id="deathDate">
+                </div>
+                
+                <div class="form-group">
+                    <label for="occupation">职业</label>
+                    <input type="text" id="occupation">
+                </div>
+                
+                <div class="form-group">
+                    <label for="notes">备注</label>
+                    <textarea id="notes" rows="3"></textarea>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeMemberModal()">取消</button>
+                    <button type="submit" class="btn btn-primary" id="submitBtn">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 查看详情模态框 -->
+    <div id="detailsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">成员详情</div>
+                <span class="close" onclick="closeDetailsModal()">&times;</span>
+            </div>
+            <div id="detailsContent"></div>
+        </div>
+    </div>
+
+    <!-- 通知组件 -->
+    <div id="notification" class="notification"></div>
+
+    <script>
+        let currentRootId = null;
+        let selectedNodeId = null;
+        let contextMenuNode = null;
+        let allMembers = [];
+        let currentGenerations = 5;
+
+        // 页面加载时初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            loadAllMembers();
+            initializeEventListeners();
+        });
+
+        // 初始化事件监听器
+        function initializeEventListeners() {
+            // 搜索框事件
+            document.getElementById('searchInput').addEventListener('input', debounce(handleSearch, 300));
+            document.getElementById('searchInput').addEventListener('focus', handleSearchFocus);
+            document.getElementById('searchInput').addEventListener('blur', handleSearchBlur);
+            
+            // 点击空白处关闭搜索结果和右键菜单
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('.search-container')) {
+                    document.getElementById('searchResults').style.display = 'none';
+                }
+                if (!e.target.closest('.context-menu')) {
+                    document.getElementById('contextMenu').style.display = 'none';
+                }
+            });
+
+            // 右键菜单事件
+            document.addEventListener('contextmenu', function(e) {
+                if (e.target.closest('.tree-node')) {
+                    e.preventDefault();
+                    showContextMenu(e, e.target.closest('.tree-node'));
+                }
+            });
+
+            // 表单提交事件
+            document.getElementById('memberForm').addEventListener('submit', handleFormSubmit);
+        }
+
+        // 加载所有成员数据
+        async function loadAllMembers() {
+            try {
+                const response = await fetch('/api/v1/individuals');
+                const data = await response.json();
+                
+                if (data.success) {
+                    allMembers = data.data || [];
+                    if (allMembers.length > 0) {
+                        // 默认显示第一个成员的家族树
+                        showFamilyTree(allMembers[0].individual_id);
+                    }
+                } else {
+                    showNotification('加载成员数据失败', 'error');
+                }
+            } catch (error) {
+                console.error('加载成员数据失败:', error);
+                showNotification('网络错误', 'error');
+            }
+        }
+
+        // 搜索处理
+        function handleSearch() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (query.length < 1) {
+                document.getElementById('searchResults').style.display = 'none';
+                return;
+            }
+
+            const results = allMembers.filter(member => 
+                member.full_name.includes(query) || 
+                (member.notes && member.notes.includes(query)) ||
+                (member.occupation && member.occupation.includes(query))
+            );
+
+            displaySearchResults(results);
+        }
+
+        // 显示搜索结果
+        function displaySearchResults(results) {
+            const container = document.getElementById('searchResults');
+            
+            if (results.length === 0) {
+                container.innerHTML = '<div class="search-result-item">未找到匹配的成员</div>';
+            } else {
+                container.innerHTML = results.map(member => `
+                    <div class="search-result-item" onclick="selectSearchResult(${member.individual_id})">
+                        <strong>${member.full_name}</strong>
+                        <div style="font-size: 0.85em; color: #666;">
+                            ${member.gender === 'male' ? '♂' : '♀'} 
+                            ${member.occupation || ''} 
+                            ${member.birth_date ? formatDate(member.birth_date) : ''}
+                        </div>
+                    </div>
+                `).join('');
+            }
+            
+            container.style.display = 'block';
+        }
+
+        // 选择搜索结果
+        function selectSearchResult(memberId) {
+            document.getElementById('searchResults').style.display = 'none';
+            document.getElementById('searchInput').value = '';
+            showFamilyTree(memberId);
+        }
+
+        // 搜索框焦点事件
+        function handleSearchFocus() {
+            if (allMembers.length > 0) {
+                displaySearchResults(allMembers.slice(0, 5)); // 显示前5个成员
+            }
+        }
+
+        // 搜索框失焦事件
+        function handleSearchBlur() {
+            setTimeout(() => {
+                document.getElementById('searchResults').style.display = 'none';
+            }, 200);
+        }
+
+        // 执行搜索
+        function performSearch() {
+            handleSearch();
+        }
+
+        // 显示家族树
+        async function showFamilyTree(rootId) {
+            if (!rootId) return;
+            
+            currentRootId = rootId;
+            
+            try {
+                // 获取家族树数据
+                const response = await fetch(`/api/v1/individuals/${rootId}/family-tree?generations=${currentGenerations}`);
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    // 获取父母和配偶信息
+                    const [parentsRes, spousesRes] = await Promise.all([
+                        fetch(`/api/v1/individuals/${rootId}/parents`),
+                        fetch(`/api/v1/individuals/${rootId}/spouses`)
+                    ]);
+                    
+                    const [parentsData, spousesData] = await Promise.all([
+                        parentsRes.json(),
+                        spousesRes.json()
+                    ]);
+                    
+                    const enrichedData = {
+                        ...data.data,
+                        parents: parentsData.success ? parentsData.data : [],
+                        spouses: spousesData.success ? spousesData.data : []
+                    };
+                    
+                    displayFamilyTree(enrichedData);
+                    updateTreeHeader(data.data.individual);
+                } else {
+                    showNotification('无法加载家族树数据', 'error');
+                }
+            } catch (error) {
+                console.error('加载家族树失败:', error);
+                showNotification('网络错误', 'error');
+            }
+        }
+
+        // 显示家族树
+        function displayFamilyTree(treeData) {
+            const container = document.getElementById('treeContainer');
+            container.innerHTML = renderFamilyTree(treeData);
+        }
+
+        // 渲染家族树
+        function renderFamilyTree(rootData) {
+            if (!rootData || !rootData.individual) {
+                return '<div class="empty-state"><div class="empty-state-icon">🌱</div><div class="empty-state-text">暂无数据</div></div>';
+            }
+            
+            let html = '<div class="tree-wrapper">';
+            
+            // 渲染父母
+            if (rootData.parents && rootData.parents.length > 0) {
+                html += '<div class="tree-generation">';
+                rootData.parents.forEach(parent => {
+                    html += renderTreeNode(parent, 'ancestor-node', '父母');
+                });
+                html += '</div>';
+                html += '<div class="tree-connector"></div>';
+            }
+            
+            // 渲染根节点和配偶
+            html += '<div class="tree-generation">';
+            html += renderTreeNode(rootData.individual, 'root-node', '本人');
+            
+            if (rootData.spouses && rootData.spouses.length > 0) {
+                html += '<div class="marriage-connector">💕</div>';
+                rootData.spouses.forEach(spouse => {
+                    html += renderTreeNode(spouse, 'spouse-node', '配偶');
+                });
+            }
+            html += '</div>';
+            
+            // 渲染后代
+            if (rootData.children && rootData.children.length > 0) {
+                html += '<div class="tree-connector"></div>';
+                html += renderDescendants(rootData.children, 1);
+            }
+            
+            html += '</div>';
+            return html;
+        }
+
+        // 渲染后代
+        function renderDescendants(children, generation) {
+            let html = '';
+            
+            if (children.length > 0) {
+                const nodeClass = generation === 1 ? 'child-node' : 'descendant-node';
+                const label = generation === 1 ? '子女' : `第${generation + 1}代`;
+                
+                html += '<div class="tree-generation">';
+                children.forEach(child => {
+                    html += renderTreeNode(child.individual, nodeClass, label);
+                });
+                html += '</div>';
+                
+                // 渲染孙辈
+                const hasGrandchildren = children.some(child => child.children && child.children.length > 0);
+                if (hasGrandchildren && generation < currentGenerations - 1) {
+                    html += '<div class="tree-connector"></div>';
+                    const grandchildren = children.flatMap(child => child.children || []);
+                    if (grandchildren.length > 0) {
+                        html += renderDescendants(grandchildren, generation + 1);
+                    }
+                }
+            }
+            
+            return html;
+        }
+
+        // 渲染树节点
+        function renderTreeNode(individual, nodeClass, label) {
+            const isSelected = selectedNodeId === individual.individual_id;
+            return `
+                <div class="tree-node ${nodeClass} ${isSelected ? 'selected' : ''}" 
+                     data-id="${individual.individual_id}"
+                     onclick="selectNode(${individual.individual_id})">
+                    <div class="node-name">${individual.full_name}</div>
+                    <div class="node-details">
+                        ${individual.gender === 'male' ? '♂' : '♀'} 
+                        ${individual.birth_date ? formatDate(individual.birth_date) : ''}
+                        ${individual.death_date ? ' - ' + formatDate(individual.death_date) : ''}
+                    </div>
+                    ${individual.occupation ? '<div class="node-occupation">' + individual.occupation + '</div>' : ''}
+                    <div style="font-size: 0.7em; color: #999; margin-top: 5px;">${label}</div>
+                </div>
+            `;
+        }
+
+        // 选择节点
+        function selectNode(nodeId) {
+            selectedNodeId = nodeId;
+            // 重新渲染以显示选中状态
+            if (currentRootId) {
+                showFamilyTree(currentRootId);
+            }
+        }
+
+        // 显示右键菜单
+        function showContextMenu(event, nodeElement) {
+            const nodeId = parseInt(nodeElement.dataset.id);
+            contextMenuNode = nodeId;
+            selectedNodeId = nodeId;
+            
+            const menu = document.getElementById('contextMenu');
+            menu.style.display = 'block';
+            menu.style.left = event.pageX + 'px';
+            menu.style.top = event.pageY + 'px';
+        }
+
+        // 更改显示代数
+        function changeGenerations() {
+            currentGenerations = parseInt(document.getElementById('generationsSelect').value);
+            if (currentRootId) {
+                showFamilyTree(currentRootId);
+            }
+        }
+
+        // 更新树头部信息
+        function updateTreeHeader(individual) {
+            document.getElementById('currentRootName').textContent = individual.full_name + ' 的家族树';
+            document.getElementById('currentGenInfo').textContent = `显示${currentGenerations}代关系`;
+        }
+
+        // 显示添加模态框
+        function showAddModal() {
+            document.getElementById('modalTitle').textContent = '添加族长';
+            document.getElementById('editingId').value = '';
+            document.getElementById('parentType').value = '';
+            document.getElementById('memberForm').reset();
+            document.getElementById('memberModal').style.display = 'block';
+        }
+
+        // 显示添加子女模态框
+        function showAddChildModal() {
+            if (!contextMenuNode) return;
+            
+            document.getElementById('modalTitle').textContent = '添加子女';
+            document.getElementById('editingId').value = '';
+            document.getElementById('parentType').value = 'child';
+            document.getElementById('memberForm').reset();
+            document.getElementById('memberModal').style.display = 'block';
+            document.getElementById('contextMenu').style.display = 'none';
+        }
+
+        // 显示添加配偶模态框
+        function showAddSpouseModal() {
+            if (!contextMenuNode) return;
+            
+            document.getElementById('modalTitle').textContent = '添加配偶';
+            document.getElementById('editingId').value = '';
+            document.getElementById('parentType').value = 'spouse';
+            document.getElementById('memberForm').reset();
+            document.getElementById('memberModal').style.display = 'block';
+            document.getElementById('contextMenu').style.display = 'none';
+        }
+
+        // 显示查看详情模态框
+        function showViewDetailsModal() {
+            if (!contextMenuNode) return;
+            
+            const member = allMembers.find(m => m.individual_id === contextMenuNode);
+            if (!member) return;
+            
+            const content = `
+                <div style="line-height: 1.8;">
+                    <p><strong>姓名：</strong>${member.full_name}</p>
+                    <p><strong>性别：</strong>${member.gender === 'male' ? '男' : '女'}</p>
+                    <p><strong>出生日期：</strong>${member.birth_date ? formatDate(member.birth_date) : '未知'}</p>
+                    ${member.death_date ? '<p><strong>去世日期：</strong>' + formatDate(member.death_date) + '</p>' : ''}
+                    <p><strong>职业：</strong>${member.occupation || '未填写'}</p>
+                    <p><strong>备注：</strong>${member.notes || '无'}</p>
+                </div>
+            `;
+            
+            document.getElementById('detailsContent').innerHTML = content;
+            document.getElementById('detailsModal').style.display = 'block';
+            document.getElementById('contextMenu').style.display = 'none';
+        }
+
+        // 编辑选中成员
+        function editSelectedMember() {
+            if (!contextMenuNode) return;
+            
+            const member = allMembers.find(m => m.individual_id === contextMenuNode);
+            if (!member) return;
+            
+            document.getElementById('modalTitle').textContent = '编辑成员信息';
+            document.getElementById('editingId').value = member.individual_id;
+            document.getElementById('fullName').value = member.full_name;
+            document.getElementById('gender').value = member.gender;
+            document.getElementById('birthDate').value = member.birth_date ? member.birth_date.split('T')[0] : '';
+            document.getElementById('deathDate').value = member.death_date ? member.death_date.split('T')[0] : '';
+            document.getElementById('occupation').value = member.occupation || '';
+            document.getElementById('notes').value = member.notes || '';
+            
+            document.getElementById('memberModal').style.display = 'block';
+            document.getElementById('contextMenu').style.display = 'none';
+        }
+
+        // 删除选中成员
+        async function deleteSelectedMember() {
+            if (!contextMenuNode) return;
+            
+            const member = allMembers.find(m => m.individual_id === contextMenuNode);
+            if (!member) return;
+            
+            if (!confirm(`确定要删除 ${member.full_name} 吗？此操作不可撤销。`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/individuals/${contextMenuNode}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification('删除成功', 'success');
+                    await loadAllMembers();
+                    if (currentRootId === contextMenuNode) {
+                        currentRootId = null;
+                        document.getElementById('treeContainer').innerHTML = `
+                            <div class="empty-state">
+                                <div class="empty-state-icon">🌱</div>
+                                <div class="empty-state-text">选择一个成员查看家族树</div>
+                            </div>
+                        `;
+                    } else if (currentRootId) {
+                        showFamilyTree(currentRootId);
+                    }
+                } else {
+                    showNotification(data.message || '删除失败', 'error');
+                }
+            } catch (error) {
+                showNotification('网络错误', 'error');
+            }
+            
+            document.getElementById('contextMenu').style.display = 'none';
+        }
+
+        // 处理表单提交
+        async function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            const formData = getFormData();
+            const editingId = document.getElementById('editingId').value;
+            const parentType = document.getElementById('parentType').value;
+            
+            try {
+                let response;
+                
+                if (editingId) {
+                    // 更新现有成员
+                    response = await fetch(`/api/v1/individuals/${editingId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(formData)
+                    });
+                } else {
+                    // 创建新成员
+                    if (parentType === 'child' && contextMenuNode) {
+                        // 设置父母ID
+                        const parentMember = allMembers.find(m => m.individual_id === contextMenuNode);
+                        if (parentMember.gender === 'male') {
+                            formData.father_id = contextMenuNode;
+                        } else {
+                            formData.mother_id = contextMenuNode;
+                        }
+                    }
+                    
+                    response = await fetch('/api/v1/individuals', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(formData)
+                    });
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(editingId ? '更新成功' : '添加成功', 'success');
+                    closeMemberModal();
+                    await loadAllMembers();
+                    
+                    if (!currentRootId) {
+                        // 如果是第一个成员，设为根节点
+                        showFamilyTree(data.data.individual_id);
+                    } else {
+                        // 刷新当前树
+                        showFamilyTree(currentRootId);
+                    }
+                } else {
+                    showNotification(data.message || '操作失败', 'error');
+                }
+            } catch (error) {
+                showNotification('网络错误', 'error');
+            }
+        }
+
+        // 获取表单数据
+        function getFormData() {
+            const data = {
+                full_name: document.getElementById('fullName').value,
+                gender: document.getElementById('gender').value,
+                occupation: document.getElementById('occupation').value || null,
+                notes: document.getElementById('notes').value || null
+            };
+            
+            const birthDate = document.getElementById('birthDate').value;
+            if (birthDate) data.birth_date = birthDate + 'T00:00:00Z';
+            
+            const deathDate = document.getElementById('deathDate').value;
+            if (deathDate) data.death_date = deathDate + 'T00:00:00Z';
+            
+            return data;
+        }
+
+        // 关闭成员模态框
+        function closeMemberModal() {
+            document.getElementById('memberModal').style.display = 'none';
+        }
+
+        // 关闭详情模态框
+        function closeDetailsModal() {
+            document.getElementById('detailsModal').style.display = 'none';
+        }
+
+        // 显示通知
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        // 格式化日期
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.getFullYear() + '年' + (date.getMonth() + 1) + '月' + date.getDate() + '日';
+        }
+
+        // 防抖函数
+        function debounce(func, wait) {
+            let timeout;
+            return function executedFunction(...args) {
+                const later = () => {
+                    clearTimeout(timeout);
+                    func(...args);
+                };
+                clearTimeout(timeout);
+                timeout = setTimeout(later, wait);
+            };
+        }
+    </script>
+</body>
+</html> 

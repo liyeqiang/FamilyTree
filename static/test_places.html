@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试出生地和埋葬地点功能</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            border-left: 4px solid #4CAF50;
+        }
+        .error {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌳 测试出生地和埋葬地点功能</h1>
+        
+        <form id="testForm">
+            <div class="form-group">
+                <label for="fullName">姓名 *</label>
+                <input type="text" id="fullName" required value="测试用户">
+            </div>
+            
+            <div class="form-group">
+                <label for="gender">性别 *</label>
+                <select id="gender" required>
+                    <option value="male">男</option>
+                    <option value="female">女</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="birthDate">出生日期</label>
+                <input type="date" id="birthDate" value="1990-01-01">
+            </div>
+            
+            <div class="form-group">
+                <label for="birthPlace">出生地点 🆕</label>
+                <input type="text" id="birthPlace" placeholder="如：北京市朝阳区" value="上海市浦东新区">
+            </div>
+            
+            <div class="form-group">
+                <label for="deathDate">去世日期</label>
+                <input type="date" id="deathDate">
+            </div>
+            
+            <div class="form-group">
+                <label for="burialPlace">埋葬地点 🆕</label>
+                <input type="text" id="burialPlace" placeholder="如：北京市昌平区墓园" value="上海市青浦墓园">
+            </div>
+            
+            <div class="form-group">
+                <label for="occupation">职业</label>
+                <input type="text" id="occupation" value="软件工程师">
+            </div>
+            
+            <div class="form-group">
+                <label for="notes">备注</label>
+                <textarea id="notes" rows="3">测试添加出生地和埋葬地点功能的示例用户</textarea>
+            </div>
+            
+            <button type="submit">创建成员</button>
+            <button type="button" onclick="loadMembers()">查看所有成员</button>
+            <button type="button" onclick="testLatestMember()">查看最新成员</button>
+        </form>
+        
+        <div id="result" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        let latestMemberId = null;
+
+        document.getElementById('testForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            await createMember();
+        });
+
+        async function createMember() {
+            const formData = {
+                full_name: document.getElementById('fullName').value,
+                gender: document.getElementById('gender').value,
+                occupation: document.getElementById('occupation').value || null,
+                notes: document.getElementById('notes').value || null
+            };
+            
+            const birthDate = document.getElementById('birthDate').value;
+            if (birthDate) formData.birth_date = birthDate + 'T00:00:00Z';
+            
+            const birthPlace = document.getElementById('birthPlace').value;
+            if (birthPlace) formData.birth_place = birthPlace;
+            
+            const deathDate = document.getElementById('deathDate').value;
+            if (deathDate) formData.death_date = deathDate + 'T00:00:00Z';
+            
+            const burialPlace = document.getElementById('burialPlace').value;
+            if (burialPlace) {
+                formData.burial_place = burialPlace;
+                formData.death_place = burialPlace;
+            }
+
+            try {
+                const response = await fetch('/api/v1/individuals', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    latestMemberId = data.data.individual_id;
+                    showResult(`✅ 成功创建成员！ID: ${latestMemberId}`, false);
+                    console.log('创建的成员数据:', data.data);
+                } else {
+                    showResult(`❌ 创建失败: ${data.message}`, true);
+                }
+            } catch (error) {
+                showResult(`❌ 网络错误: ${error.message}`, true);
+            }
+        }
+
+        async function loadMembers() {
+            try {
+                const response = await fetch('/api/v1/individuals');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const members = data.data || [];
+                    let html = `<h3>📋 所有成员 (${members.length}个)</h3>`;
+                    
+                    members.forEach(member => {
+                        html += `
+                            <div style="border: 1px solid #ddd; padding: 10px; margin: 10px 0; border-radius: 4px;">
+                                <strong>${member.full_name}</strong> (ID: ${member.individual_id})
+                                <br>性别: ${member.gender === 'male' ? '男' : '女'}
+                                ${member.birth_date ? '<br>出生: ' + formatDate(member.birth_date) : ''}
+                                ${member.birth_place ? '<br>🏠 出生地: ' + member.birth_place : ''}
+                                ${member.death_date ? '<br>去世: ' + formatDate(member.death_date) : ''}
+                                ${member.burial_place || member.death_place ? '<br>⚰️ 埋葬地: ' + (member.burial_place || member.death_place) : ''}
+                                ${member.occupation ? '<br>职业: ' + member.occupation : ''}
+                            </div>
+                        `;
+                    });
+                    
+                    showResult(html, false);
+                } else {
+                    showResult(`❌ 加载失败: ${data.message}`, true);
+                }
+            } catch (error) {
+                showResult(`❌ 网络错误: ${error.message}`, true);
+            }
+        }
+
+        async function testLatestMember() {
+            if (!latestMemberId) {
+                showResult('❌ 请先创建一个成员', true);
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/v1/individuals/${latestMemberId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    const member = data.data;
+                    let html = `
+                        <h3>👤 最新成员详情</h3>
+                        <div style="border: 1px solid #ddd; padding: 15px; border-radius: 4px; background: #f9f9f9;">
+                            <p><strong>ID:</strong> ${member.individual_id}</p>
+                            <p><strong>姓名:</strong> ${member.full_name}</p>
+                            <p><strong>性别:</strong> ${member.gender === 'male' ? '男' : '女'}</p>
+                            ${member.birth_date ? '<p><strong>出生日期:</strong> ' + formatDate(member.birth_date) + '</p>' : ''}
+                            ${member.birth_place ? '<p><strong>🏠 出生地点:</strong> ' + member.birth_place + '</p>' : ''}
+                            ${member.death_date ? '<p><strong>去世日期:</strong> ' + formatDate(member.death_date) + '</p>' : ''}
+                            ${member.burial_place ? '<p><strong>⚰️ 埋葬地点 (burial_place):</strong> ' + member.burial_place + '</p>' : ''}
+                            ${member.death_place ? '<p><strong>📍 去世地点 (death_place):</strong> ' + member.death_place + '</p>' : ''}
+                            ${member.occupation ? '<p><strong>职业:</strong> ' + member.occupation + '</p>' : ''}
+                            ${member.notes ? '<p><strong>备注:</strong> ' + member.notes + '</p>' : ''}
+                        </div>
+                    `;
+                    showResult(html, false);
+                } else {
+                    showResult(`❌ 查询失败: ${data.message}`, true);
+                }
+            } catch (error) {
+                showResult(`❌ 网络错误: ${error.message}`, true);
+            }
+        }
+
+        function showResult(message, isError) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = message;
+            resultDiv.className = 'result' + (isError ? ' error' : '');
+            resultDiv.style.display = 'block';
+            resultDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.getFullYear() + '年' + (date.getMonth() + 1) + '月' + date.getDate() + '日';
+        }
+
+        // 页面加载时显示说明
+        window.addEventListener('load', function() {
+            showResult(`
+                <h3>🧪 功能测试说明</h3>
+                <p><strong>新增字段：</strong></p>
+                <ul>
+                    <li>🏠 <strong>出生地点</strong> - 记录个人的出生地</li>
+                    <li>⚰️ <strong>埋葬地点</strong> - 记录个人的埋葬地</li>
+                </ul>
+                <p><strong>测试步骤：</strong></p>
+                <ol>
+                    <li>填写表单（已预填示例数据）</li>
+                    <li>点击"创建成员"按钮</li>
+                    <li>点击"查看最新成员"查看详细信息</li>
+                    <li>点击"查看所有成员"查看列表</li>
+                </ol>
+                <p><em>💡 提示：新字段将在族谱界面和成员详情中显示</em></p>
+            `, false);
+        });
+    </script>
+</body>
+</html> 

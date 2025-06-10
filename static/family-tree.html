@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🌳 家谱管理系统</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            padding: 30px;
+        }
+
+        .section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            border: 1px solid #e9ecef;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 1.5em;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #555;
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: #4CAF50;
+            box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
+        }
+
+        .btn {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+
+        .btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .btn-danger {
+            background: #f44336;
+        }
+
+        .btn-danger:hover {
+            background: #da190b;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+        }
+
+        .btn-secondary:hover {
+            background: #545b62;
+        }
+
+        .individuals-list {
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .individual-card {
+            background: white;
+            border: 1px solid #e9ecef;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s;
+        }
+
+        .individual-card:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+            transform: translateY(-2px);
+        }
+
+        .individual-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+
+        .individual-name {
+            font-size: 1.2em;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .individual-gender {
+            padding: 4px 8px;
+            border-radius: 15px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .gender-male {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .gender-female {
+            background: #fce4ec;
+            color: #c2185b;
+        }
+
+        .individual-info {
+            color: #666;
+            font-size: 0.9em;
+            line-height: 1.4;
+        }
+
+        .individual-actions {
+            margin-top: 10px;
+        }
+
+        .individual-actions button {
+            padding: 6px 12px;
+            font-size: 0.85em;
+        }
+
+        .search-bar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .search-bar input {
+            flex: 1;
+        }
+
+        .family-tree {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+            min-height: 300px;
+            border: 1px solid #e9ecef;
+        }
+
+        .tree-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .tree-node {
+            background: #f8f9fa;
+            border: 2px solid #4CAF50;
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px;
+            text-align: center;
+            min-width: 120px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .tree-node:hover {
+            background: #e8f5e8;
+            transform: scale(1.05);
+        }
+
+        .tree-node.selected {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .tree-level {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .relationship-info {
+            background: #e8f5e8;
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .relationship-section {
+            margin-bottom: 15px;
+        }
+
+        .relationship-section h4 {
+            color: #4CAF50;
+            margin-bottom: 8px;
+        }
+
+        .relationship-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .relationship-tag {
+            background: white;
+            border: 1px solid #4CAF50;
+            color: #4CAF50;
+            padding: 4px 12px;
+            border-radius: 15px;
+            font-size: 0.85em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .relationship-tag:hover {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .error {
+            background: #ffebee;
+            color: #c62828;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #f44336;
+        }
+
+        .success {
+            background: #e8f5e8;
+            color: #2e7d32;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #4CAF50;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close:hover {
+            color: #333;
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 15px 20px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 600;
+            z-index: 1001;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            background: #4CAF50;
+        }
+
+        .notification.error {
+            background: #f44336;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                gap: 20px;
+                padding: 20px;
+            }
+            
+            .tree-controls {
+                flex-direction: column;
+            }
+            
+            .search-bar {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🌳 家谱管理系统</h1>
+            <p>管理您的家族成员信息，探索家族关系网络</p>
+        </div>
+
+        <div class="main-content">
+            <!-- 个人信息管理 -->
+            <div class="section">
+                <h2>👤 个人信息管理</h2>
+                
+                <form id="individualForm">
+                    <input type="hidden" id="editingId" value="">
+                    
+                    <div class="form-group">
+                        <label for="fullName">姓名 *</label>
+                        <input type="text" id="fullName" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="gender">性别 *</label>
+                        <select id="gender" class="form-control" required>
+                            <option value="">请选择</option>
+                            <option value="male">男</option>
+                            <option value="female">女</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="birthDate">出生日期</label>
+                        <input type="date" id="birthDate" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="deathDate">逝世日期</label>
+                        <input type="date" id="deathDate" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="occupation">职业</label>
+                        <input type="text" id="occupation" class="form-control">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="fatherId">父亲</label>
+                        <select id="fatherId" class="form-control">
+                            <option value="">请选择父亲</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="motherId">母亲</label>
+                        <select id="motherId" class="form-control">
+                            <option value="">请选择母亲</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="notes">备注</label>
+                        <textarea id="notes" class="form-control" rows="3"></textarea>
+                    </div>
+                    
+                    <div>
+                        <button type="submit" class="btn" id="submitBtn">添加成员</button>
+                        <button type="button" class="btn btn-secondary" id="cancelBtn" onclick="cancelEdit()" style="display: none;">取消</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- 成员列表 -->
+            <div class="section">
+                <h2>👥 成员列表</h2>
+                
+                <div class="search-bar">
+                    <input type="text" id="searchQuery" class="form-control" placeholder="搜索姓名、职业或备注...">
+                    <button type="button" class="btn" onclick="searchIndividuals()">搜索</button>
+                    <button type="button" class="btn btn-secondary" onclick="loadIndividuals()">全部</button>
+                </div>
+                
+                <div id="individualsList" class="individuals-list">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+
+            <!-- 族谱关系 -->
+            <div class="section full-width">
+                <h2>🌲 族谱关系</h2>
+                
+                <div class="tree-controls">
+                    <select id="treeRootSelect" class="form-control" style="width: 200px;">
+                        <option value="">选择族谱根节点</option>
+                    </select>
+                    <button type="button" class="btn" onclick="showFamilyTree()">显示族谱</button>
+                    <button type="button" class="btn btn-secondary" onclick="showRelationships()">显示关系</button>
+                </div>
+                
+                <div id="familyTreeContainer" class="family-tree">
+                    <div class="loading">请选择一个成员查看族谱关系</div>
+                </div>
+                
+                <div id="relationshipsContainer" class="relationship-info" style="display: none;">
+                    <!-- 关系信息将在这里显示 -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 确认删除模态框 -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeDeleteModal()">&times;</span>
+            <h3>确认删除</h3>
+            <p id="deleteMessage">您确定要删除这个家族成员吗？此操作不可逆转。</p>
+            <div style="margin-top: 20px;">
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">确认删除</button>
+                <button type="button" class="btn btn-secondary" onclick="closeDeleteModal()">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知框 -->
+    <div id="notification" class="notification"></div>
+
+    <script>
+        let individuals = [];
+        let selectedIndividual = null;
+        let deleteTargetId = null;
+
+        // 初始化页面
+        document.addEventListener('DOMContentLoaded', function() {
+            loadIndividuals();
+            setupForm();
+        });
+
+        // 设置表单提交
+        function setupForm() {
+            document.getElementById('individualForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                saveIndividual();
+            });
+        }
+
+        // 加载全部成员
+        async function loadIndividuals() {
+            try {
+                const response = await fetch('/api/v1/individuals');
+                const data = await response.json();
+                
+                if (data.success) {
+                    individuals = data.data || [];
+                    displayIndividuals(individuals);
+                    updateParentSelects();
+                    updateTreeRootSelect();
+                } else {
+                    showNotification('加载成员列表失败', 'error');
+                }
+            } catch (error) {
+                showNotification('网络错误: ' + error.message, 'error');
+            }
+        }
+
+        // 显示成员列表
+        function displayIndividuals(list) {
+            const container = document.getElementById('individualsList');
+            
+            if (list.length === 0) {
+                container.innerHTML = '<div class="loading">暂无成员数据</div>';
+                return;
+            }
+            
+            const html = list.map(individual => `
+                <div class="individual-card">
+                    <div class="individual-header">
+                        <div>
+                            <span class="individual-name">${individual.full_name}</span>
+                            <span class="individual-gender ${individual.gender === 'male' ? 'gender-male' : 'gender-female'}">
+                                ${individual.gender === 'male' ? '男' : '女'}
+                            </span>
+                        </div>
+                    </div>
+                    <div class="individual-info">
+                        ${individual.birth_date ? `出生: ${formatDate(individual.birth_date)}` : ''}
+                        ${individual.death_date ? ` | 逝世: ${formatDate(individual.death_date)}` : ''}
+                        ${individual.occupation ? `<br>职业: ${individual.occupation}` : ''}
+                        ${individual.notes ? `<br>备注: ${individual.notes}` : ''}
+                    </div>
+                    <div class="individual-actions">
+                        <button class="btn btn-secondary" onclick="editIndividual(${individual.individual_id})">编辑</button>
+                        <button class="btn btn-danger" onclick="confirmDelete(${individual.individual_id}, '${individual.full_name}')">删除</button>
+                        <button class="btn" onclick="selectForTree(${individual.individual_id})">查看关系</button>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = html;
+        }
+
+        // 搜索成员
+        async function searchIndividuals() {
+            const query = document.getElementById('searchQuery').value.trim();
+            
+            try {
+                const url = query ? 
+                    `/api/v1/individuals?query=${encodeURIComponent(query)}` : 
+                    '/api/v1/individuals';
+                
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if (data.success) {
+                    displayIndividuals(data.data || []);
+                } else {
+                    showNotification('搜索失败', 'error');
+                }
+            } catch (error) {
+                showNotification('搜索出错: ' + error.message, 'error');
+            }
+        }
+
+        // 保存成员（新增或更新）
+        async function saveIndividual() {
+            const formData = getFormData();
+            const editingId = document.getElementById('editingId').value;
+            
+            try {
+                let response;
+                if (editingId) {
+                    // 更新
+                    response = await fetch(`/api/v1/individuals/${editingId}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(formData)
+                    });
+                } else {
+                    // 新增
+                    response = await fetch('/api/v1/individuals', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(formData)
+                    });
+                }
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification(editingId ? '更新成功' : '添加成功', 'success');
+                    resetForm();
+                    loadIndividuals();
+                } else {
+                    showNotification(data.message || '操作失败', 'error');
+                }
+            } catch (error) {
+                showNotification('网络错误: ' + error.message, 'error');
+            }
+        }
+
+        // 编辑成员
+        function editIndividual(id) {
+            const individual = individuals.find(p => p.individual_id === id);
+            if (!individual) return;
+            
+            document.getElementById('editingId').value = id;
+            document.getElementById('fullName').value = individual.full_name || '';
+            document.getElementById('gender').value = individual.gender || '';
+            document.getElementById('birthDate').value = individual.birth_date ? individual.birth_date.split('T')[0] : '';
+            document.getElementById('deathDate').value = individual.death_date ? individual.death_date.split('T')[0] : '';
+            document.getElementById('occupation').value = individual.occupation || '';
+            document.getElementById('fatherId').value = individual.father_id || '';
+            document.getElementById('motherId').value = individual.mother_id || '';
+            document.getElementById('notes').value = individual.notes || '';
+            
+            document.getElementById('submitBtn').textContent = '更新成员';
+            document.getElementById('cancelBtn').style.display = 'inline-block';
+            
+            // 滚动到表单顶部
+            document.querySelector('.section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 取消编辑
+        function cancelEdit() {
+            resetForm();
+        }
+
+        // 确认删除
+        function confirmDelete(id, name) {
+            deleteTargetId = id;
+            document.getElementById('deleteMessage').textContent = `您确定要删除 "${name}" 吗？此操作不可逆转。`;
+            document.getElementById('deleteModal').style.display = 'block';
+            
+            document.getElementById('confirmDeleteBtn').onclick = function() {
+                deleteIndividual(id);
+                closeDeleteModal();
+            };
+        }
+
+        // 删除成员
+        async function deleteIndividual(id) {
+            try {
+                const response = await fetch(`/api/v1/individuals/${id}`, {
+                    method: 'DELETE'
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showNotification('删除成功', 'success');
+                    loadIndividuals();
+                } else {
+                    showNotification(data.message || '删除失败', 'error');
+                }
+            } catch (error) {
+                showNotification('网络错误: ' + error.message, 'error');
+            }
+        }
+
+        // 选择查看族谱
+        function selectForTree(id) {
+            selectedIndividual = individuals.find(p => p.individual_id === id);
+            document.getElementById('treeRootSelect').value = id;
+            showFamilyTree();
+        }
+
+        // 显示家族树
+        async function showFamilyTree() {
+            const rootId = document.getElementById('treeRootSelect').value;
+            if (!rootId) {
+                document.getElementById('familyTreeContainer').innerHTML = '<div class="loading">请选择一个成员查看族谱</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/individuals/${rootId}/family-tree`);
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    displayFamilyTree(data.data);
+                } else {
+                    document.getElementById('familyTreeContainer').innerHTML = '<div class="loading">无法加载族谱数据</div>';
+                }
+            } catch (error) {
+                showNotification('加载族谱失败: ' + error.message, 'error');
+            }
+        }
+
+        // 显示族谱树
+        function displayFamilyTree(treeData) {
+            const container = document.getElementById('familyTreeContainer');
+            container.innerHTML = renderTreeNode(treeData);
+            document.getElementById('relationshipsContainer').style.display = 'none';
+        }
+
+        // 渲染树节点
+        function renderTreeNode(node, level = 0) {
+            if (!node) return '';
+            
+            const individual = node.individual;
+            let html = `
+                <div class="tree-level" style="margin-left: ${level * 40}px;">
+                    <div class="tree-node" onclick="selectTreeNode(${individual.individual_id}, this)">
+                        <strong>${individual.full_name}</strong>
+                        <div style="font-size: 0.8em; color: #666;">
+                            ${individual.gender === 'male' ? '♂' : '♀'} 
+                            ${individual.birth_date ? formatDate(individual.birth_date) : ''}
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            if (node.children && node.children.length > 0) {
+                html += '<div style="margin-left: 20px;">';
+                node.children.forEach(child => {
+                    html += renderTreeNode(child, level + 1);
+                });
+                html += '</div>';
+            }
+            
+            return html;
+        }
+
+        // 选择树节点
+        function selectTreeNode(id, element) {
+            // 清除之前的选择
+            document.querySelectorAll('.tree-node').forEach(node => {
+                node.classList.remove('selected');
+            });
+            
+            // 选择当前节点
+            element.classList.add('selected');
+            
+            // 显示关系信息
+            showRelationships(id);
+        }
+
+        // 显示关系信息
+        async function showRelationships(id = null) {
+            const targetId = id || document.getElementById('treeRootSelect').value;
+            if (!targetId) return;
+            
+            try {
+                const [parentsRes, childrenRes, siblingsRes] = await Promise.all([
+                    fetch(`/api/v1/individuals/${targetId}/parents`),
+                    fetch(`/api/v1/individuals/${targetId}/children`),
+                    fetch(`/api/v1/individuals/${targetId}/siblings`)
+                ]);
+                
+                const [parentsData, childrenData, siblingsData] = await Promise.all([
+                    parentsRes.json(),
+                    childrenRes.json(),
+                    siblingsRes.json()
+                ]);
+                
+                displayRelationships({
+                    parents: parentsData.success ? parentsData.data : [],
+                    children: childrenData.success ? childrenData.data : [],
+                    siblings: siblingsData.success ? siblingsData.data : []
+                });
+                
+            } catch (error) {
+                showNotification('加载关系信息失败: ' + error.message, 'error');
+            }
+        }
+
+        // 显示关系信息
+        function displayRelationships(relationships) {
+            const container = document.getElementById('relationshipsContainer');
+            
+            let html = '<h3>家族关系</h3>';
+            
+            if (relationships.parents && relationships.parents.length > 0) {
+                html += '<div class="relationship-section">';
+                html += '<h4>👨‍👩‍👧‍👦 父母</h4>';
+                html += '<div class="relationship-list">';
+                relationships.parents.forEach(parent => {
+                    html += `<span class="relationship-tag" onclick="selectForTree(${parent.individual_id})">${parent.full_name}</span>`;
+                });
+                html += '</div></div>';
+            }
+            
+            if (relationships.children && relationships.children.length > 0) {
+                html += '<div class="relationship-section">';
+                html += '<h4>👶 子女</h4>';
+                html += '<div class="relationship-list">';
+                relationships.children.forEach(child => {
+                    html += `<span class="relationship-tag" onclick="selectForTree(${child.individual_id})">${child.full_name}</span>`;
+                });
+                html += '</div></div>';
+            }
+            
+            if (relationships.siblings && relationships.siblings.length > 0) {
+                html += '<div class="relationship-section">';
+                html += '<h4>👫 兄弟姐妹</h4>';
+                html += '<div class="relationship-list">';
+                relationships.siblings.forEach(sibling => {
+                    html += `<span class="relationship-tag" onclick="selectForTree(${sibling.individual_id})">${sibling.full_name}</span>`;
+                });
+                html += '</div></div>';
+            }
+            
+            if (!relationships.parents?.length && !relationships.children?.length && !relationships.siblings?.length) {
+                html += '<div class="loading">暂无家族关系信息</div>';
+            }
+            
+            container.innerHTML = html;
+            container.style.display = 'block';
+        }
+
+        // 工具函数
+        function getFormData() {
+            const data = {
+                full_name: document.getElementById('fullName').value,
+                gender: document.getElementById('gender').value,
+                occupation: document.getElementById('occupation').value || null,
+                notes: document.getElementById('notes').value || null
+            };
+            
+            const birthDate = document.getElementById('birthDate').value;
+            if (birthDate) data.birth_date = birthDate + 'T00:00:00Z';
+            
+            const deathDate = document.getElementById('deathDate').value;
+            if (deathDate) data.death_date = deathDate + 'T00:00:00Z';
+            
+            const fatherId = document.getElementById('fatherId').value;
+            if (fatherId) data.father_id = parseInt(fatherId);
+            
+            const motherId = document.getElementById('motherId').value;
+            if (motherId) data.mother_id = parseInt(motherId);
+            
+            return data;
+        }
+
+        function resetForm() {
+            document.getElementById('individualForm').reset();
+            document.getElementById('editingId').value = '';
+            document.getElementById('submitBtn').textContent = '添加成员';
+            document.getElementById('cancelBtn').style.display = 'none';
+        }
+
+        function updateParentSelects() {
+            const fatherSelect = document.getElementById('fatherId');
+            const motherSelect = document.getElementById('motherId');
+            
+            // 清空选项
+            fatherSelect.innerHTML = '<option value="">请选择父亲</option>';
+            motherSelect.innerHTML = '<option value="">请选择母亲</option>';
+            
+            // 添加选项
+            individuals.forEach(individual => {
+                if (individual.gender === 'male') {
+                    fatherSelect.innerHTML += `<option value="${individual.individual_id}">${individual.full_name}</option>`;
+                } else if (individual.gender === 'female') {
+                    motherSelect.innerHTML += `<option value="${individual.individual_id}">${individual.full_name}</option>`;
+                }
+            });
+        }
+
+        function updateTreeRootSelect() {
+            const select = document.getElementById('treeRootSelect');
+            select.innerHTML = '<option value="">选择族谱根节点</option>';
+            
+            individuals.forEach(individual => {
+                select.innerHTML += `<option value="${individual.individual_id}">${individual.full_name}</option>`;
+            });
+        }
+
+        function formatDate(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            return date.getFullYear() + '年' + (date.getMonth() + 1) + '月' + date.getDate() + '日';
+        }
+
+        function showNotification(message, type = 'success') {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.classList.add('show');
+            
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, 3000);
+        }
+
+        function closeDeleteModal() {
+            document.getElementById('deleteModal').style.display = 'none';
+            deleteTargetId = null;
+        }
+
+        // 搜索框回车事件
+        document.getElementById('searchQuery').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                searchIndividuals();
+            }
+        });
+
+        // 点击模态框外部关闭
+        window.onclick = function(event) {
+            const modal = document.getElementById('deleteModal');
+            if (event.target == modal) {
+                closeDeleteModal();
+            }
+        }
+    </script>
+</body>
+</html> 

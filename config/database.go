@@ -6,7 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // DatabaseConfig 数据库配置结构
@@ -37,7 +37,7 @@ func (c *DatabaseConfig) Connect() (*sql.DB, error) {
 		}
 	}
 
-	db, err := sql.Open("sqlite3", c.DBPath+"?_foreign_keys=on")
+	db, err := sql.Open("sqlite", c.DBPath+"?_foreign_keys=on")
 	if err != nil {
 		return nil, fmt.Errorf("打开数据库失败: %v", err)
 	}
