@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试添加子女</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .form-group { margin: 10px 0; }
+        label { display: inline-block; width: 100px; }
+        input, select { width: 200px; padding: 5px; }
+        button { padding: 10px 20px; margin: 10px 5px; }
+        #result { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <h1>测试添加子女功能</h1>
+    
+    <div class="form-group">
+        <label>姓名:</label>
+        <input type="text" id="fullName" value="李小三">
+    </div>
+    
+    <div class="form-group">
+        <label>性别:</label>
+        <select id="gender">
+            <option value="male">男</option>
+            <option value="female">女</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label>出生日期:</label>
+        <input type="date" id="birthDate" value="2000-01-01">
+    </div>
+    
+    <div class="form-group">
+        <label>父亲ID:</label>
+        <input type="number" id="fatherId" value="12" placeholder="李富贵的ID">
+    </div>
+    
+    <div class="form-group">
+        <label>母亲ID:</label>
+        <select id="motherId">
+            <option value="">请选择母亲</option>
+            <option value="13">王美丽 (第一任妻子)</option>
+            <option value="14">赵小花 (第二任妻子)</option>
+        </select>
+    </div>
+    
+    <button onclick="addChild()">添加子女</button>
+    <button onclick="checkSpouses()">检查配偶</button>
+    <button onclick="checkFamilies()">检查家庭关系</button>
+    
+    <div id="result"></div>
+
+    <script>
+        async function addChild() {
+            const result = document.getElementById('result');
+            
+            try {
+                const formData = {
+                    full_name: document.getElementById('fullName').value,
+                    gender: document.getElementById('gender').value,
+                    birth_date: document.getElementById('birthDate').value + 'T00:00:00Z',
+                    father_id: parseInt(document.getElementById('fatherId').value),
+                    mother_id: parseInt(document.getElementById('motherId').value)
+                };
+                
+                console.log('发送数据:', formData);
+                
+                const response = await fetch('/api/v1/individuals', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const data = await response.json();
+                
+                result.innerHTML = `
+                    <h3>结果:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                result.innerHTML = `<h3>错误:</h3><p>${error.message}</p>`;
+            }
+        }
+
+        async function checkSpouses() {
+            const result = document.getElementById('result');
+            
+            try {
+                const response = await fetch('/api/v1/individuals/12/spouses');
+                const data = await response.json();
+                
+                result.innerHTML = `
+                    <h3>李富贵的配偶:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                result.innerHTML = `<h3>错误:</h3><p>${error.message}</p>`;
+            }
+        }
+
+        async function checkFamilies() {
+            const result = document.getElementById('result');
+            
+            try {
+                const response = await fetch('/api/v1/families/husband/12');
+                const data = await response.json();
+                
+                result.innerHTML = `
+                    <h3>李富贵的家庭关系:</h3>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                result.innerHTML = `<h3>错误:</h3><p>${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html> 

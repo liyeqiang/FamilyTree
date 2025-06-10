@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS families (
     family_id INTEGER PRIMARY KEY AUTOINCREMENT,
     husband_id INTEGER,
     wife_id INTEGER,
+    marriage_order INTEGER DEFAULT 1,
     marriage_date DATE,
     marriage_place_id INTEGER,
     divorce_date DATE,
@@ -159,9 +160,9 @@ INSERT OR IGNORE INTO individuals (individual_id, full_name, gender, birth_date,
 UPDATE individuals SET father_id = 1, mother_id = 2 WHERE individual_id = 3;
 UPDATE individuals SET father_id = 3, mother_id = 4 WHERE individual_id = 5;
 
-INSERT OR IGNORE INTO families (family_id, husband_id, wife_id, marriage_date, marriage_place_id) VALUES
-(1, 1, 2, '1974-05-01', 1),
-(2, 3, 4, '2003-10-08', 1);
+INSERT OR IGNORE INTO families (family_id, husband_id, wife_id, marriage_order, marriage_date, marriage_place_id) VALUES
+(1, 1, 2, 1, '1974-05-01', 1),
+(2, 3, 4, 1, '2003-10-08', 1);
 
 INSERT OR IGNORE INTO children (family_id, individual_id, relationship_type, birth_order) VALUES
 (1, 3, 'biological', 1),

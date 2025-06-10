@@ -92,4 +92,40 @@ func (h *FamilyHandler) AddSpouse(w http.ResponseWriter, r *http.Request) {
 		Data:    family,
 		Message: "配偶关系添加成功",
 	})
+}
+
+// GetFamiliesByHusband 根据丈夫ID获取所有家庭关系
+func (h *FamilyHandler) GetFamiliesByHusband(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	husbandID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的丈夫ID",
+		})
+		return
+	}
+
+	families, err := h.service.GetByIndividualID(r.Context(), husbandID)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	// 只返回该男性作为丈夫的家庭
+	husbandFamilies := make([]models.Family, 0)
+	for _, family := range families {
+		if family.HusbandID != nil && *family.HusbandID == husbandID {
+			husbandFamilies = append(husbandFamilies, family)
+		}
+	}
+
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    husbandFamilies,
+		Message: "获取家庭关系成功",
+	})
 } 

@@ -61,6 +61,7 @@ func (s *FamilyService) CreateFamily(ctx context.Context, req *models.CreateFami
 	family := &models.Family{
 		HusbandID:        req.HusbandID,
 		WifeID:           req.WifeID,
+		MarriageOrder:    1, // 默认为第一任
 		MarriageDate:     req.MarriageDate,
 		MarriagePlaceID:  req.MarriagePlaceID,
 		DivorceDate:      req.DivorceDate,
@@ -184,7 +185,7 @@ func (s *FamilyService) AddSpouse(ctx context.Context, individualID, spouseID in
 		return nil, fmt.Errorf("配偶信息不存在")
 	}
 
-	// 检查是否已经存在配偶关系
+	// 检查是否已经存在相同的配偶关系
 	existingFamilies, err := s.repo.GetFamiliesByIndividualID(ctx, individualID)
 	if err != nil {
 		return nil, err
@@ -193,18 +194,40 @@ func (s *FamilyService) AddSpouse(ctx context.Context, individualID, spouseID in
 	for _, family := range existingFamilies {
 		if (family.HusbandID != nil && *family.HusbandID == spouseID) ||
 		   (family.WifeID != nil && *family.WifeID == spouseID) {
-			return nil, fmt.Errorf("已存在配偶关系")
+			return nil, fmt.Errorf("已存在相同的配偶关系")
 		}
 	}
 
-	// 根据性别确定夫妻角色
+	// 根据性别确定夫妻角色并计算婚姻顺序
 	var req *models.CreateFamilyRequest
+	var marriageOrder int = 1
+	
 	if individual.Gender == models.GenderMale && spouse.Gender == models.GenderFemale {
+		// 男性添加妻子 - 计算他的妻子数量
+		for _, family := range existingFamilies {
+			if family.HusbandID != nil && *family.HusbandID == individualID {
+				if family.MarriageOrder >= marriageOrder {
+					marriageOrder = family.MarriageOrder + 1
+				}
+			}
+		}
 		req = &models.CreateFamilyRequest{
 			HusbandID: &individualID,
 			WifeID:    &spouseID,
 		}
 	} else if individual.Gender == models.GenderFemale && spouse.Gender == models.GenderMale {
+		// 女性添加丈夫 - 计算丈夫的妻子数量
+		spouseFamilies, err := s.repo.GetFamiliesByIndividualID(ctx, spouseID)
+		if err != nil {
+			return nil, err
+		}
+		for _, family := range spouseFamilies {
+			if family.HusbandID != nil && *family.HusbandID == spouseID {
+				if family.MarriageOrder >= marriageOrder {
+					marriageOrder = family.MarriageOrder + 1
+				}
+			}
+		}
 		req = &models.CreateFamilyRequest{
 			HusbandID: &spouseID,
 			WifeID:    &individualID,
@@ -213,7 +236,20 @@ func (s *FamilyService) AddSpouse(ctx context.Context, individualID, spouseID in
 		return nil, fmt.Errorf("配偶关系必须是一男一女")
 	}
 
-	return s.CreateFamily(ctx, req)
+	// 创建家庭关系，包含婚姻顺序
+	family := &models.Family{
+		HusbandID:        req.HusbandID,
+		WifeID:           req.WifeID,
+		MarriageOrder:    marriageOrder,
+		MarriageDate:     req.MarriageDate,
+		MarriagePlaceID:  req.MarriagePlaceID,
+		DivorceDate:      req.DivorceDate,
+		Notes:            req.Notes,
+		CreatedAt:        time.Now(),
+		UpdatedAt:        time.Now(),
+	}
+
+	return s.repo.CreateFamily(ctx, family)
 }
 
 // AddChild 为家庭添加子女

@@ -57,6 +57,11 @@ func NewDemoRepository() *DemoRepository {
 	birthDate2030 := time.Date(2030, 8, 15, 0, 0, 0, 0, time.UTC)
 	birthDate2032 := time.Date(2032, 11, 20, 0, 0, 0, 0, time.UTC)
 	birthDate2055 := time.Date(2055, 2, 28, 0, 0, 0, 0, time.UTC)
+	// 一夫多妻演示数据的时间变量
+	birthDate1970 := time.Date(1970, 6, 15, 0, 0, 0, 0, time.UTC)
+	birthDate1980 := time.Date(1980, 4, 25, 0, 0, 0, 0, time.UTC)
+	birthDate1995 := time.Date(1995, 7, 12, 0, 0, 0, 0, time.UTC)
+	birthDate1998 := time.Date(1998, 9, 8, 0, 0, 0, 0, time.UTC)
 	
 	individuals := []models.Individual{
 		// 第1代（祖父母）
@@ -81,21 +86,32 @@ func NewDemoRepository() *DemoRepository {
 		
 		// 第6代（曾孙）
 		{IndividualID: 11, FullName: "张宝宝", Gender: models.GenderMale, BirthDate: &birthDate2055, BirthPlace: "上海市浦东新区", Occupation: "", Notes: "张小小和陈小雅的儿子", FatherID: &[]int{9}[0], MotherID: &[]int{10}[0], CreatedAt: now, UpdatedAt: now},
+		
+		// 添加一夫多妻的演示数据
+		{IndividualID: 12, FullName: "李富贵", Gender: models.GenderMale, BirthDate: &birthDate1970, BirthPlace: "上海", Occupation: "商人", Notes: "有两个妻子的富商", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 13, FullName: "王美丽", Gender: models.GenderFemale, BirthDate: &birthDate1975, BirthPlace: "上海", Occupation: "家庭主妇", Notes: "李富贵的第一任妻子", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 14, FullName: "赵小花", Gender: models.GenderFemale, BirthDate: &birthDate1980, BirthPlace: "上海", Occupation: "教师", Notes: "李富贵的第二任妻子", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 15, FullName: "李大宝", Gender: models.GenderMale, BirthDate: &birthDate1995, BirthPlace: "上海", Notes: "李富贵和王美丽的儿子", FatherID: &[]int{12}[0], MotherID: &[]int{13}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 16, FullName: "李二宝", Gender: models.GenderFemale, BirthDate: &birthDate1998, BirthPlace: "上海", Notes: "李富贵和王美丽的女儿", FatherID: &[]int{12}[0], MotherID: &[]int{13}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 17, FullName: "李小花", Gender: models.GenderFemale, BirthDate: &birthDate2005, BirthPlace: "上海", Notes: "李富贵和赵小花的女儿", FatherID: &[]int{12}[0], MotherID: &[]int{14}[0], CreatedAt: now, UpdatedAt: now},
 	}
 	
 	repo.individuals = individuals
-	repo.nextID = 12
+	repo.nextID = 18
 	
 	// 添加示例家庭数据 - 6代家族的配偶关系
 	families := []models.Family{
-		{FamilyID: 1, HusbandID: &[]int{1}[0], WifeID: &[]int{2}[0], Notes: "张老爷子和李老太太的家庭", CreatedAt: now, UpdatedAt: now},
-		{FamilyID: 2, HusbandID: &[]int{3}[0], WifeID: &[]int{4}[0], Notes: "张伟和王丽的家庭", CreatedAt: now, UpdatedAt: now},
-		{FamilyID: 3, HusbandID: &[]int{5}[0], WifeID: &[]int{6}[0], Notes: "张明和李美的家庭", CreatedAt: now, UpdatedAt: now},
-		{FamilyID: 4, HusbandID: &[]int{7}[0], WifeID: &[]int{8}[0], Notes: "张小宝和赵小花的家庭", CreatedAt: now, UpdatedAt: now},
-		{FamilyID: 5, HusbandID: &[]int{9}[0], WifeID: &[]int{10}[0], Notes: "张小小和陈小雅的家庭", CreatedAt: now, UpdatedAt: now},
+		{FamilyID: 1, HusbandID: &[]int{1}[0], WifeID: &[]int{2}[0], MarriageOrder: 1, Notes: "张老爷子和李老太太的家庭", CreatedAt: now, UpdatedAt: now},
+		{FamilyID: 2, HusbandID: &[]int{3}[0], WifeID: &[]int{4}[0], MarriageOrder: 1, Notes: "张伟和王丽的家庭", CreatedAt: now, UpdatedAt: now},
+		{FamilyID: 3, HusbandID: &[]int{5}[0], WifeID: &[]int{6}[0], MarriageOrder: 1, Notes: "张明和李美的家庭", CreatedAt: now, UpdatedAt: now},
+		{FamilyID: 4, HusbandID: &[]int{7}[0], WifeID: &[]int{8}[0], MarriageOrder: 1, Notes: "张小宝和赵小花的家庭", CreatedAt: now, UpdatedAt: now},
+		{FamilyID: 5, HusbandID: &[]int{9}[0], WifeID: &[]int{10}[0], MarriageOrder: 1, Notes: "张小小和陈小雅的家庭", CreatedAt: now, UpdatedAt: now},
+		// 一夫多妻的家庭关系
+		{FamilyID: 6, HusbandID: &[]int{12}[0], WifeID: &[]int{13}[0], MarriageOrder: 1, Notes: "李富贵和王美丽的家庭（第一任妻子）", CreatedAt: now, UpdatedAt: now},
+		{FamilyID: 7, HusbandID: &[]int{12}[0], WifeID: &[]int{14}[0], MarriageOrder: 2, Notes: "李富贵和赵小花的家庭（第二任妻子）", CreatedAt: now, UpdatedAt: now},
 	}
 	repo.families = families
-	repo.nextFamilyID = 6
+	repo.nextFamilyID = 8
 	
 	// 添加示例子女关系数据 - 6代家族的父子关系
 	childrenData := []models.Child{
@@ -104,9 +120,13 @@ func NewDemoRepository() *DemoRepository {
 		{ChildID: 3, FamilyID: 3, IndividualID: 7, RelationshipToParents: "生子", CreatedAt: now, UpdatedAt: now},
 		{ChildID: 4, FamilyID: 4, IndividualID: 9, RelationshipToParents: "生子", CreatedAt: now, UpdatedAt: now},
 		{ChildID: 5, FamilyID: 5, IndividualID: 11, RelationshipToParents: "生子", CreatedAt: now, UpdatedAt: now},
+		// 一夫多妻的子女关系
+		{ChildID: 6, FamilyID: 6, IndividualID: 15, RelationshipToParents: "生子", CreatedAt: now, UpdatedAt: now}, // 李大宝 - 第一任妻子的儿子
+		{ChildID: 7, FamilyID: 6, IndividualID: 16, RelationshipToParents: "生女", CreatedAt: now, UpdatedAt: now}, // 李二宝 - 第一任妻子的女儿
+		{ChildID: 8, FamilyID: 7, IndividualID: 17, RelationshipToParents: "生女", CreatedAt: now, UpdatedAt: now}, // 李小花 - 第二任妻子的女儿
 	}
 	repo.children = childrenData
-	repo.nextChildID = 6
+	repo.nextChildID = 9
 	
 	return repo
 }
@@ -417,7 +437,8 @@ func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *h
 	individuals.HandleFunc("/{id:[0-9]+}/add-spouse", familyHandler.AddSpouse).Methods("POST")
 	
 	// 家庭关系路由
-	families := api.PathPrefix("/families").Subrouter()
+	families := router.PathPrefix("/api/v1/families").Subrouter()
+	families.HandleFunc("/husband/{id:[0-9]+}", familyHandler.GetFamiliesByHusband).Methods("GET")
 	families.HandleFunc("", familyHandler.CreateFamily).Methods("POST")
 
 	// 健康检查
@@ -438,6 +459,11 @@ func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *h
 
 	// 静态文件服务
 	router.PathPrefix("/static/").Handler(http.StripPrefix("/static/", http.FileServer(http.Dir("./static/"))))
+
+	// 测试页面
+	router.HandleFunc("/test_add_child.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "test_add_child.html")
+	}).Methods("GET")
 
 	// UI管理界面
 	router.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {

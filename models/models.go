@@ -79,6 +79,7 @@ type Family struct {
 	FamilyID         int       `json:"family_id" db:"family_id"`
 	HusbandID        *int      `json:"husband_id" db:"husband_id"`
 	WifeID           *int      `json:"wife_id" db:"wife_id"`
+	MarriageOrder    int       `json:"marriage_order" db:"marriage_order"`     // 婚姻顺序（第几任妻子）
 	MarriageDate     *time.Time `json:"marriage_date" db:"marriage_date"`
 	MarriagePlaceID  *int      `json:"marriage_place_id" db:"marriage_place_id"`
 	DivorceDate      *time.Time `json:"divorce_date" db:"divorce_date"`

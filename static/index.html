@@ -276,6 +276,101 @@
             margin: 0 10px;
         }
 
+        /* 多妻子显示样式 */
+        .spouses-group {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .spouse-separator {
+            color: #ccc;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+
+        .wives-children-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .wife-children-group {
+            border: 2px solid #e8f4f8;
+            border-radius: 10px;
+            padding: 15px;
+            background-color: #f9fdff;
+        }
+
+        .wife-children-header {
+            font-weight: bold;
+            color: #2c5aa0;
+            text-align: center;
+            margin-bottom: 15px;
+            padding: 8px;
+            background-color: #e8f4f8;
+            border-radius: 5px;
+            font-size: 0.9em;
+        }
+
+        /* 一夫多妻演示特殊样式 */
+        .polygamy-demo {
+            background: linear-gradient(135deg, #ff9a9e 0%, #fecfef 50%, #fecfef 100%);
+            border: 2px solid #ff6b9d;
+            font-weight: bold;
+        }
+
+        .polygamy-demo:hover {
+            background: linear-gradient(135deg, #ff6b9d 0%, #ff9a9e 50%, #fecfef 100%);
+            transform: scale(1.05);
+        }
+
+        /* 线条连接样式 */
+        .polygamy-children-container {
+            position: relative;
+        }
+
+        .child-with-connection {
+            position: relative;
+            display: inline-block;
+            margin: 0 15px;
+            vertical-align: top;
+        }
+
+        .mother-connection {
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            height: 30px;
+            z-index: 1;
+        }
+
+        .mother-label {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.75em;
+            font-weight: bold;
+            background: white;
+            padding: 2px 6px;
+            border-radius: 12px;
+            border: 1px solid;
+            white-space: nowrap;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .mother-info {
+            font-size: 0.7em;
+            font-weight: bold;
+            margin-top: 5px;
+            padding: 2px 6px;
+            background: rgba(255,255,255,0.8);
+            border-radius: 10px;
+            text-align: center;
+        }
+
         .tree-connector {
             width: 3px;
             height: 40px;
@@ -618,6 +713,17 @@
                     <textarea id="notes" rows="3"></textarea>
                 </div>
                 
+                <!-- 妻子选择（仅在添加子女时显示） -->
+                <div class="form-group" id="wifeSelectionGroup" style="display: none;">
+                    <label for="selectedWife">选择母亲</label>
+                    <select id="selectedWife">
+                        <option value="">请选择母亲</option>
+                    </select>
+                    <div style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                        如果父亲有多个妻子，请选择孩子的母亲
+                    </div>
+                </div>
+                
                 <div class="form-actions">
                     <button type="button" class="btn btn-secondary" onclick="closeMemberModal()">取消</button>
                     <button type="submit" class="btn btn-primary" id="submitBtn">保存</button>
@@ -692,8 +798,17 @@
                 if (data.success) {
                     allMembers = data.data || [];
                     if (allMembers.length > 0) {
-                        // 默认显示第一个成员的家族树
-                        showFamilyTree(allMembers[0].individual_id);
+                        // 检查是否有李富贵(ID:12)，优先显示一夫多妻的演示
+                        const polygamyDemo = allMembers.find(m => m.individual_id === 12);
+                        const defaultId = polygamyDemo ? 12 : allMembers[0].individual_id;
+                        showFamilyTree(defaultId);
+                        
+                        // 如果显示李富贵，提示用户这是一夫多妻演示
+                        if (polygamyDemo && defaultId === 12) {
+                            setTimeout(() => {
+                                showNotification('🎯 正在显示李富贵的一夫多妻家族树演示', 'success');
+                            }, 1000);
+                        }
                     }
                 } else {
                     showNotification('加载成员数据失败', 'error');
@@ -729,8 +844,8 @@
                 container.innerHTML = '<div class="search-result-item">未找到匹配的成员</div>';
             } else {
                 container.innerHTML = results.map(member => `
-                    <div class="search-result-item" onclick="selectSearchResult(${member.individual_id})">
-                        <strong>${member.full_name}</strong>
+                    <div class="search-result-item ${member.individual_id === 12 ? 'polygamy-demo' : ''}" onclick="selectSearchResult(${member.individual_id})">
+                        <strong>${member.full_name}${member.individual_id === 12 ? ' 🔥一夫多妻演示' : ''}</strong>
                         <div style="font-size: 0.85em; color: #666;">
                             ${member.gender === 'male' ? '♂' : '♀'} 
                             ${member.occupation || ''} 
@@ -857,25 +972,150 @@
                 html += '<div class="tree-connector"></div>';
             }
             
-            // 渲染根节点和配偶
+            // 渲染根节点和配偶（支持一夫多妻）
             html += '<div class="tree-generation">';
             html += renderTreeNode(rootData.individual, 'root-node', '本人');
             
             if (rootData.spouses && rootData.spouses.length > 0) {
                 html += '<div class="marriage-connector">💕</div>';
-                rootData.spouses.forEach(spouse => {
-                    html += renderTreeNode(spouse, 'spouse-node', '配偶');
-                });
+                html += '<div class="spouses-group">';
+                for (let i = 0; i < rootData.spouses.length; i++) {
+                    const spouse = rootData.spouses[i];
+                    if (i > 0) html += '<div class="spouse-separator">|</div>';
+                    
+                    let wifeOrder = 1;
+                    if (rootData.individual.gender === 'male' && spouse.gender === 'female') {
+                        wifeOrder = await getWifeOrder(rootData.individual.individual_id, spouse.individual_id);
+                    }
+                    
+                    const wifeLabel = wifeOrder > 1 ? `第${wifeOrder}任妻子` : '配偶';
+                    html += renderTreeNode(spouse, 'spouse-node', wifeLabel);
+                }
+                html += '</div>';
             }
             html += '</div>';
             
-            // 渲染后代
+            // 渲染后代（按妻子分组）
             if (rootData.children && rootData.children.length > 0) {
                 html += '<div class="tree-connector"></div>';
-                html += await renderDescendants(rootData.children, 1);
+                html += await renderDescendantsByWife(rootData, 1);
             }
             
             html += '</div>';
+            return html;
+        }
+
+        // 获取妻子顺序
+        async function getWifeOrder(husbandId, wifeId) {
+            try {
+                const response = await fetch(`/api/v1/families/husband/${husbandId}`);
+                const data = await response.json();
+                if (data.success && data.data) {
+                    const family = data.data.find(f => f.wife_id === wifeId);
+                    return family ? family.marriage_order : 1;
+                }
+            } catch (error) {
+                console.error('获取妻子顺序失败:', error);
+            }
+            return 1;
+        }
+
+        // 按妻子分组渲染后代（用线条连接）
+        async function renderDescendantsByWife(rootData, generation) {
+            let html = '';
+            
+            if (!rootData.children || rootData.children.length === 0) {
+                return html;
+            }
+            
+            const nodeClass = generation === 1 ? 'child-node' : 'descendant-node';
+            const label = generation === 1 ? '子女' : `第${generation + 1}代`;
+            
+            // 如果根节点是男性且有配偶，检查是否需要用线条连接显示子女
+            if (rootData.individual.gender === 'male' && rootData.spouses && rootData.spouses.length > 0) {
+                // 检查是否有多个妻子或子女来自不同母亲
+                const wives = rootData.spouses.filter(s => s.gender === 'female');
+                const uniqueMothers = [...new Set(rootData.children.map(c => c.individual.mother_id).filter(id => id))];
+                const shouldShowConnections = wives.length > 1 || uniqueMothers.length > 1;
+                
+                if (shouldShowConnections) {
+                    // 获取所有家庭关系
+                    try {
+                        const familiesResponse = await fetch(`/api/v1/families/husband/${rootData.individual.individual_id}`);
+                        const familiesData = await familiesResponse.json();
+                        const families = familiesData.success ? familiesData.data : [];
+                        
+                        // 创建妻子到颜色的映射
+                        const wifeColors = ['#ff6b9d', '#4ecdc4', '#45b7d1', '#96ceb4', '#ffeaa7'];
+                        const wifeToColor = {};
+                        let colorIndex = 0;
+                        
+                        wives.forEach(wife => {
+                            wifeToColor[wife.individual_id] = wifeColors[colorIndex % wifeColors.length];
+                            colorIndex++;
+                        });
+                        
+                        html += '<div class="polygamy-children-container">';
+                        html += '<div class="tree-generation">';
+                        
+                        // 渲染所有子女在同一层
+                        for (const child of rootData.children) {
+                            const motherId = child.individual.mother_id;
+                            const mother = wives.find(w => w.individual_id === motherId);
+                            const family = families.find(f => f.wife_id === motherId);
+                            const wifeOrder = family ? family.marriage_order : 1;
+                            const wifeLabel = wifeOrder > 1 ? `第${wifeOrder}任妻子` : '妻子';
+                            const connectionColor = mother ? wifeToColor[motherId] : '#ccc';
+                            
+                            html += '<div class="child-with-connection">';
+                            
+                            // 连接线到母亲
+                            if (mother) {
+                                html += `<div class="mother-connection" style="border-left: 3px solid ${connectionColor};">`;
+                                html += `<div class="mother-label" style="color: ${connectionColor}; border-color: ${connectionColor};">${mother.full_name}(${wifeLabel})</div>`;
+                                html += '</div>';
+                            }
+                            
+                            // 子女节点
+                            html += '<div class="family-group">';
+                            html += renderTreeNodeWithConnection(child.individual, nodeClass, label, connectionColor, mother ? mother.full_name : '');
+                            
+                            // 获取子女的配偶
+                            try {
+                                const spousesResponse = await fetch(`/api/v1/individuals/${child.individual.individual_id}/spouses`);
+                                const spousesData = await spousesResponse.json();
+                                
+                                if (spousesData.success && spousesData.data && spousesData.data.length > 0) {
+                                    spousesData.data.forEach(spouse => {
+                                        html += '<div class="marriage-connector">💕</div>';
+                                        html += renderTreeNode(spouse, nodeClass + ' spouse-node', label === '子女' ? '子女配偶' : '后代配偶');
+                                    });
+                                }
+                            } catch (error) {
+                                console.error('获取子女配偶信息失败:', error);
+                            }
+                            
+                            html += '</div>';
+                            html += '</div>';
+                        }
+                        
+                        html += '</div>';
+                        html += '</div>';
+                        
+                    } catch (error) {
+                        console.error('获取家庭关系失败:', error);
+                        // 如果出错，回退到原来的渲染方式
+                        html += await renderDescendants(rootData.children, generation);
+                    }
+                } else {
+                    // 普通情况，直接渲染子女
+                    html += await renderDescendants(rootData.children, generation);
+                }
+            } else {
+                // 普通情况，直接渲染子女
+                html += await renderDescendants(rootData.children, generation);
+            }
+            
             return html;
         }
 
@@ -949,6 +1189,28 @@
             `;
         }
 
+        // 渲染带连接线的树节点
+        function renderTreeNodeWithConnection(individual, nodeClass, label, connectionColor, motherName) {
+            const isSelected = selectedNodeId === individual.individual_id;
+            return `
+                <div class="tree-node ${nodeClass} ${isSelected ? 'selected' : ''}" 
+                     data-id="${individual.individual_id}"
+                     onclick="selectNode(${individual.individual_id})"
+                     style="border-left: 3px solid ${connectionColor};">
+                    <div class="node-name">${individual.full_name}</div>
+                    <div class="node-details">
+                        ${individual.gender === 'male' ? '♂' : '♀'} 
+                        ${individual.birth_date ? formatDate(individual.birth_date) : ''}
+                        ${individual.death_date ? ' - ' + formatDate(individual.death_date) : ''}
+                        ${individual.birth_place ? '<br>📍 ' + individual.birth_place : ''}
+                    </div>
+                    ${individual.occupation ? '<div class="node-occupation">' + individual.occupation + '</div>' : ''}
+                    ${motherName ? `<div class="mother-info" style="color: ${connectionColor};">👩 ${motherName}</div>` : ''}
+                    <div style="font-size: 0.7em; color: #999; margin-top: 5px;">${label}</div>
+                </div>
+            `;
+        }
+
         // 选择节点
         function selectNode(nodeId) {
             selectedNodeId = nodeId;
@@ -994,13 +1256,53 @@
         }
 
         // 显示添加子女模态框
-        function showAddChildModal() {
+        async function showAddChildModal() {
             if (!contextMenuNode) return;
             
             document.getElementById('modalTitle').textContent = '添加子女';
             document.getElementById('editingId').value = '';
             document.getElementById('parentType').value = 'child';
             document.getElementById('memberForm').reset();
+            
+            // 隐藏其他特殊字段
+            document.getElementById('wifeSelectionGroup').style.display = 'none';
+            
+            // 获取父母信息
+            const parentMember = allMembers.find(m => m.individual_id === contextMenuNode);
+            if (!parentMember) return;
+            
+            // 如果是男性，检查是否有多个妻子
+            if (parentMember.gender === 'male') {
+                try {
+                    const spousesResponse = await fetch(`/api/v1/individuals/${contextMenuNode}/spouses`);
+                    const spousesData = await spousesResponse.json();
+                    
+                    if (spousesData.success && spousesData.data && spousesData.data.length > 0) {
+                        const wives = spousesData.data.filter(spouse => spouse.gender === 'female');
+                        
+                        if (wives.length > 1) {
+                            // 显示妻子选择
+                            const select = document.getElementById('selectedWife');
+                            select.innerHTML = '<option value="">请选择母亲</option>';
+                            
+                            wives.forEach(wife => {
+                                const option = document.createElement('option');
+                                option.value = wife.individual_id;
+                                option.textContent = wife.full_name;
+                                select.appendChild(option);
+                            });
+                            
+                            document.getElementById('wifeSelectionGroup').style.display = 'block';
+                        } else if (wives.length === 1) {
+                            // 只有一个妻子，自动选择
+                            document.getElementById('selectedWife').innerHTML = `<option value="${wives[0].individual_id}" selected>${wives[0].full_name}</option>`;
+                        }
+                    }
+                } catch (error) {
+                    console.error('获取配偶信息失败:', error);
+                }
+            }
+            
             document.getElementById('memberModal').style.display = 'block';
             document.getElementById('contextMenu').style.display = 'none';
         }
@@ -1221,29 +1523,39 @@
                         const parentMember = allMembers.find(m => m.individual_id === contextMenuNode);
                         console.log('添加子女 - 父母成员:', parentMember);
                         
-                        // 获取配偶信息
-                        const spousesResponse = await fetch(`/api/v1/individuals/${contextMenuNode}/spouses`);
-                        const spousesData = await spousesResponse.json();
-                        const spouses = spousesData.success ? spousesData.data : [];
-                        console.log('添加子女 - 配偶信息:', spouses);
-                        
                         if (parentMember.gender === 'male') {
                             formData.father_id = contextMenuNode;
-                            // 如果父亲有配偶，自动设置母亲
-                            if (spouses.length > 0) {
-                                const spouse = spouses[0];
-                                if (spouse.gender === 'female') {
-                                    formData.mother_id = spouse.individual_id;
+                            
+                            // 检查是否选择了特定的妻子
+                            const selectedWifeId = document.getElementById('selectedWife').value;
+                            if (selectedWifeId) {
+                                formData.mother_id = parseInt(selectedWifeId);
+                                console.log('添加子女 - 选择的母亲ID:', selectedWifeId);
+                            } else {
+                                // 如果没有选择，尝试自动设置（兼容单妻子情况）
+                                const spousesResponse = await fetch(`/api/v1/individuals/${contextMenuNode}/spouses`);
+                                const spousesData = await spousesResponse.json();
+                                const spouses = spousesData.success ? spousesData.data : [];
+                                
+                                const wives = spouses.filter(spouse => spouse.gender === 'female');
+                                if (wives.length === 1) {
+                                    formData.mother_id = wives[0].individual_id;
+                                } else if (wives.length > 1) {
+                                    showNotification('请选择孩子的母亲', 'warning');
+                                    return;
                                 }
                             }
                         } else if (parentMember.gender === 'female') {
                             formData.mother_id = contextMenuNode;
                             // 如果母亲有配偶，自动设置父亲
-                            if (spouses.length > 0) {
-                                const spouse = spouses[0];
-                                if (spouse.gender === 'male') {
-                                    formData.father_id = spouse.individual_id;
-                                }
+                            const spousesResponse = await fetch(`/api/v1/individuals/${contextMenuNode}/spouses`);
+                            const spousesData = await spousesResponse.json();
+                            const spouses = spousesData.success ? spousesData.data : [];
+                            
+                            const husbands = spouses.filter(spouse => spouse.gender === 'male');
+                            if (husbands.length > 0) {
+                                // 如果有多个丈夫，选择第一个（在实际应用中可能需要用户选择）
+                                formData.father_id = husbands[0].individual_id;
                             }
                         }
                         
