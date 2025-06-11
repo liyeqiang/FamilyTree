@@ -536,6 +536,22 @@
                 e.preventDefault();
                 saveIndividual();
             });
+            
+            // 监听性别选择变化
+            document.getElementById('gender').addEventListener('change', function(e) {
+                const editingId = document.getElementById('editingId').value;
+                if (editingId) {
+                    const individual = individuals.find(p => p.individual_id === parseInt(editingId));
+                    if (individual && individual.gender !== this.value) {
+                        const warning = individual.gender === 'male' ? 
+                            '警告：将性别从男性改为女性会清除该人员作为父亲的所有关系！' : 
+                            '警告：将性别从女性改为男性会清除该人员作为母亲的所有关系！';
+                            
+                        // 显示警告
+                        showNotification(warning, 'error');
+                    }
+                }
+            });
         }
 
         // 加载全部成员
@@ -619,10 +635,24 @@
         async function saveIndividual() {
             const formData = getFormData();
             const editingId = document.getElementById('editingId').value;
+            let genderChanged = false;
+            
+            // 检查是否修改了性别
+            if (editingId) {
+                const individual = individuals.find(p => p.individual_id === parseInt(editingId));
+                if (individual && individual.gender !== formData.gender) {
+                    genderChanged = true;
+                    console.log('检测到性别变更:', individual.gender, '->', formData.gender);
+                    console.log('原始数据:', individual);
+                }
+            }
             
             try {
                 let response;
                 if (editingId) {
+                    // 更新前记录数据
+                    console.log('发送更新数据:', formData);
+                    
                     // 更新
                     response = await fetch(`/api/v1/individuals/${editingId}`, {
                         method: 'PUT',
@@ -631,6 +661,8 @@
                     });
                 } else {
                     // 新增
+                    console.log('发送新增数据:', formData);
+                    
                     response = await fetch('/api/v1/individuals', {
                         method: 'POST',
                         headers: {'Content-Type': 'application/json'},
@@ -639,15 +671,34 @@
                 }
                 
                 const data = await response.json();
+                console.log('服务器响应:', data);
                 
                 if (data.success) {
                     showNotification(editingId ? '更新成功' : '添加成功', 'success');
                     resetForm();
-                    loadIndividuals();
+                    
+                    // 先加载成员列表
+                    await loadIndividuals();
+                    
+                    // 如果修改了性别或更新了当前选中的成员，需要刷新族谱
+                    const currentTreeRoot = document.getElementById('treeRootSelect').value;
+                    if (genderChanged || (currentTreeRoot && parseInt(currentTreeRoot) === parseInt(editingId))) {
+                        console.log('需要刷新族谱');
+                        // 先清除族谱缓存
+                        clearFamilyTreeCache();
+                        // 重新加载族谱
+                        await showFamilyTree();
+                        
+                        // 如果当前正在查看的是被修改的成员，刷新关系信息
+                        if (currentTreeRoot && parseInt(currentTreeRoot) === parseInt(editingId)) {
+                            await showRelationships(parseInt(editingId));
+                        }
+                    }
                 } else {
                     showNotification(data.message || '操作失败', 'error');
                 }
             } catch (error) {
+                console.error('保存失败:', error);
                 showNotification('网络错误: ' + error.message, 'error');
             }
         }
@@ -657,21 +708,52 @@
             const individual = individuals.find(p => p.individual_id === id);
             if (!individual) return;
             
+            console.log('加载编辑数据:', individual);
+            
+            // 设置表单字段
             document.getElementById('editingId').value = id;
             document.getElementById('fullName').value = individual.full_name || '';
             document.getElementById('gender').value = individual.gender || '';
             document.getElementById('birthDate').value = individual.birth_date ? individual.birth_date.split('T')[0] : '';
             document.getElementById('deathDate').value = individual.death_date ? individual.death_date.split('T')[0] : '';
             document.getElementById('occupation').value = individual.occupation || '';
+            
+            // 确保父亲ID和母亲ID正确设置
             document.getElementById('fatherId').value = individual.father_id || '';
             document.getElementById('motherId').value = individual.mother_id || '';
+            
             document.getElementById('notes').value = individual.notes || '';
             
+            // 更新按钮文本和状态
             document.getElementById('submitBtn').textContent = '更新成员';
             document.getElementById('cancelBtn').style.display = 'inline-block';
             
+            // 确保父母选择器包含当前选项
+            updateParentSelects();
+            
+            // 特别处理：如果当前选择的父亲/母亲性别与实际不符（可能是之前的数据），确保他们出现在选择列表中
+            if (individual.father_id) {
+                ensureParentInSelect('fatherId', individual.father_id);
+            }
+            if (individual.mother_id) {
+                ensureParentInSelect('motherId', individual.mother_id);
+            }
+            
             // 滚动到表单顶部
             document.querySelector('.section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // 确保父母出现在选择列表中
+        function ensureParentInSelect(selectId, parentId) {
+            const select = document.getElementById(selectId);
+            const parent = individuals.find(p => p.individual_id === parentId);
+            
+            if (parent && !Array.from(select.options).some(option => option.value == parentId)) {
+                // 如果父母不在选择列表中（可能因为性别不匹配），添加他们
+                select.innerHTML += `<option value="${parent.individual_id}">${parent.full_name}${selectId === 'fatherId' ? ' (原父亲)' : ' (原母亲)'}</option>`;
+                // 选中这个选项
+                select.value = parentId;
+            }
         }
 
         // 取消编辑
@@ -727,7 +809,14 @@
             }
             
             try {
-                const response = await fetch(`/api/v1/individuals/${rootId}/family-tree`);
+                // 添加时间戳参数避免缓存
+                const timestamp = new Date().getTime();
+                const response = await fetch(`/api/v1/individuals/${rootId}/family-tree?_=${timestamp}`, {
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
                 const data = await response.json();
                 
                 if (data.success && data.data) {
@@ -795,10 +884,18 @@
             if (!targetId) return;
             
             try {
+                // 添加时间戳参数避免缓存
+                const timestamp = new Date().getTime();
                 const [parentsRes, childrenRes, siblingsRes] = await Promise.all([
-                    fetch(`/api/v1/individuals/${targetId}/parents`),
-                    fetch(`/api/v1/individuals/${targetId}/children`),
-                    fetch(`/api/v1/individuals/${targetId}/siblings`)
+                    fetch(`/api/v1/individuals/${targetId}/parents?_=${timestamp}`, {
+                        headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+                    }),
+                    fetch(`/api/v1/individuals/${targetId}/children?_=${timestamp}`, {
+                        headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+                    }),
+                    fetch(`/api/v1/individuals/${targetId}/siblings?_=${timestamp}`, {
+                        headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+                    })
                 ]);
                 
                 const [parentsData, childrenData, siblingsData] = await Promise.all([
@@ -877,11 +974,61 @@
             const deathDate = document.getElementById('deathDate').value;
             if (deathDate) data.death_date = deathDate + 'T00:00:00Z';
             
+            // 处理父亲ID - 必须明确设置为null，不能是0或undefined
             const fatherId = document.getElementById('fatherId').value;
-            if (fatherId) data.father_id = parseInt(fatherId);
+            if (fatherId && fatherId !== "0") {
+                data.father_id = parseInt(fatherId);
+            } else {
+                // 明确设置为null，而不是0或省略字段
+                data.father_id = null;
+            }
             
+            // 处理母亲ID - 必须明确设置为null，不能是0或undefined
             const motherId = document.getElementById('motherId').value;
-            if (motherId) data.mother_id = parseInt(motherId);
+            if (motherId && motherId !== "0") {
+                data.mother_id = parseInt(motherId);
+            } else {
+                // 明确设置为null，而不是0或省略字段
+                data.mother_id = null;
+            }
+            
+            // 检查是否正在编辑现有成员
+            const editingId = document.getElementById('editingId').value;
+            if (editingId) {
+                const individual = individuals.find(p => p.individual_id === parseInt(editingId));
+                if (individual) {
+                    // 检查性别变更
+                    if (individual.gender !== data.gender) {
+                        console.log('性别变更检测:', individual.gender, '->', data.gender);
+                        console.log('父亲ID:', data.father_id === null ? 'null' : data.father_id);
+                        console.log('母亲ID:', data.mother_id === null ? 'null' : data.mother_id);
+                        
+                        // 确保将所有必要的信息传递给后端
+                        if (!data.hasOwnProperty('birth_place')) {
+                            data.birth_place = individual.birth_place || null;
+                        }
+                        
+                        if (!data.hasOwnProperty('death_place')) {
+                            data.death_place = individual.death_place || null;
+                        }
+                        
+                        if (!data.hasOwnProperty('burial_place')) {
+                            data.burial_place = individual.burial_place || null;
+                        }
+                        
+                        if (individual.birth_place_id && !data.hasOwnProperty('birth_place_id')) {
+                            data.birth_place_id = individual.birth_place_id;
+                        }
+                        
+                        if (individual.death_place_id && !data.hasOwnProperty('death_place_id')) {
+                            data.death_place_id = individual.death_place_id;
+                        }
+                        
+                        // 记录变更前后的状态，便于调试
+                        console.log('更新数据:', data);
+                    }
+                }
+            }
             
             return data;
         }
@@ -954,6 +1101,22 @@
             const modal = document.getElementById('deleteModal');
             if (event.target == modal) {
                 closeDeleteModal();
+            }
+        }
+
+        // 清除族谱缓存
+        function clearFamilyTreeCache() {
+            // 添加时间戳参数，确保刷新族谱时不使用缓存
+            const timestamp = new Date().getTime();
+            const rootId = document.getElementById('treeRootSelect').value;
+            if (rootId) {
+                fetch(`/api/v1/individuals/${rootId}/family-tree?_=${timestamp}`, { 
+                    method: 'GET',
+                    headers: {
+                        'Cache-Control': 'no-cache',
+                        'Pragma': 'no-cache'
+                    }
+                });
             }
         }
     </script>

@@ -130,13 +130,126 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 		return nil, err
 	}
 
+	// 检查性别是否变更
+	var newGender models.Gender
+	if req.Gender != nil {
+		newGender = *req.Gender
+	} else {
+		newGender = current.Gender
+	}
+
+	// 如果性别变更了，需要调整相关的父母关系
+	if current.Gender != newGender {
+		// 获取以此人为父亲/母亲的所有子女
+		children, err := s.repo.GetIndividualsByParentID(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("检查子女关系失败: %v", err)
+		}
+
+		// 根据性别变更调整子女的父母关系
+		for _, child := range children {
+			childUpdate := &models.Individual{
+				FullName:     child.FullName,
+				Gender:       child.Gender,
+				BirthDate:    child.BirthDate,
+				BirthPlaceID: child.BirthPlaceID,
+				DeathDate:    child.DeathDate,
+				DeathPlaceID: child.DeathPlaceID,
+				Occupation:   child.Occupation,
+				Notes:        child.Notes,
+				PhotoURL:     child.PhotoURL,
+				FatherID:     child.FatherID,
+				MotherID:     child.MotherID,
+			}
+
+			// 如果从男性变为女性，将此人从父亲转为母亲
+			if current.Gender == models.GenderMale && newGender != models.GenderMale {
+				if child.FatherID != nil && *child.FatherID == id {
+					childUpdate.FatherID = nil
+					childUpdate.MotherID = &id
+				}
+			}
+
+			// 如果从女性变为男性，将此人从母亲转为父亲
+			if current.Gender == models.GenderFemale && newGender != models.GenderFemale {
+				if child.MotherID != nil && *child.MotherID == id {
+					childUpdate.MotherID = nil
+					childUpdate.FatherID = &id
+				}
+			}
+
+			// 更新子女信息
+			_, err = s.repo.UpdateIndividual(ctx, child.IndividualID, childUpdate)
+			if err != nil {
+				return nil, fmt.Errorf("更新子女关系失败: %v", err)
+			}
+		}
+	}
+
+	if req.FatherID == nil {
+		req.FatherID = current.FatherID
+	}
+	if req.MotherID == nil {
+		req.MotherID = current.MotherID
+	}
+	if req.BirthDate == nil {
+		req.BirthDate = current.BirthDate
+	}
+	if req.BirthPlace == nil {
+		birthPlace := current.BirthPlace
+		req.BirthPlace = &birthPlace
+	}
+	if req.BirthPlaceID == nil {
+		req.BirthPlaceID = current.BirthPlaceID
+	}
+	if req.DeathDate == nil {
+		req.DeathDate = current.DeathDate
+	}
+	if req.DeathPlace == nil {
+		deathPlace := current.DeathPlace
+		req.DeathPlace = &deathPlace
+	}
+	if req.BurialPlace == nil {
+		burialPlace := current.BurialPlace
+		req.BurialPlace = &burialPlace
+	}
+	if req.DeathPlaceID == nil {
+		req.DeathPlaceID = current.DeathPlaceID
+	}
+	if req.Occupation == nil {
+		occupation := current.Occupation
+		req.Occupation = &occupation
+	}
+	if req.Notes == nil {
+		notes := current.Notes
+		req.Notes = &notes
+	}
+	if req.PhotoURL == nil {
+		photoURL := current.PhotoURL
+		req.PhotoURL = &photoURL
+	}
+
+	fmt.Println("===== 性别变更调试信息 =====")
+	fmt.Println("个人ID:", id)
+	fmt.Println("当前性别:", current.Gender)
+	fmt.Println("新性别:", newGender)
+	fmt.Println("当前父亲ID:", current.FatherID)
+	fmt.Println("当前母亲ID:", current.MotherID)
+	fmt.Println("请求中的性别:", req.Gender)
+	fmt.Println("请求中的父亲ID:", req.FatherID)
+	fmt.Println("请求中的母亲ID:", req.MotherID)
+	fmt.Println("==========================")
+
 	// 更新个人信息（使用指针字段的值或保持原值）
 	individual := &models.Individual{
 		FullName:     getStringValue(req.FullName, current.FullName),
 		Gender:       getGenderValue(req.Gender, current.Gender),
 		BirthDate:    req.BirthDate,
+		BirthPlace:   getStringValue(req.BirthPlace, current.BirthPlace),
 		BirthPlaceID: req.BirthPlaceID,
 		DeathDate:    req.DeathDate,
+		DeathPlace:   getStringValue(req.DeathPlace, current.DeathPlace),
+		BurialPlace:  getStringValue(req.BurialPlace, current.BurialPlace),
 		DeathPlaceID: req.DeathPlaceID,
 		Occupation:   getStringValue(req.Occupation, current.Occupation),
 		Notes:        getStringValue(req.Notes, current.Notes),
@@ -288,7 +401,7 @@ func (s *IndividualService) GetSpouses(ctx context.Context, id int) ([]models.In
 	if id <= 0 {
 		return nil, fmt.Errorf("无效的个人ID")
 	}
-	
+
 	return s.repo.GetSpouses(ctx, id)
 }
 
@@ -418,4 +531,4 @@ func (s *IndividualService) GetFamilyTree(ctx context.Context, rootID int, gener
 	}
 
 	return node, nil
-} 
+}
