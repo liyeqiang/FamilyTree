@@ -229,17 +229,6 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 		req.PhotoURL = &photoURL
 	}
 
-	fmt.Println("===== 性别变更调试信息 =====")
-	fmt.Println("个人ID:", id)
-	fmt.Println("当前性别:", current.Gender)
-	fmt.Println("新性别:", newGender)
-	fmt.Println("当前父亲ID:", current.FatherID)
-	fmt.Println("当前母亲ID:", current.MotherID)
-	fmt.Println("请求中的性别:", req.Gender)
-	fmt.Println("请求中的父亲ID:", req.FatherID)
-	fmt.Println("请求中的母亲ID:", req.MotherID)
-	fmt.Println("==========================")
-
 	// 更新个人信息（使用指针字段的值或保持原值）
 	individual := &models.Individual{
 		FullName:     getStringValue(req.FullName, current.FullName),
