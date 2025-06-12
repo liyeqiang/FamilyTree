@@ -500,11 +500,16 @@
             position: fixed;
             background: white;
             border-radius: 8px;
-            box-shadow: 0 5px 20px rgba(0,0,0,0.15);
-            padding: 8px 0;
-            z-index: 1000;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+            padding: 6px 0;
+            z-index: 3000;
             display: none;
-            min-width: 180px;
+            min-width: 200px;
+            max-width: 250px;
+            border: 2px solid #e0e0e0;
+            max-height: 350px;
+            overflow-y: auto;
+            overflow-x: hidden;
         }
 
         .context-menu-item {
@@ -512,15 +517,39 @@
             cursor: pointer;
             transition: all 0.3s;
             font-size: 14px;
+            display: flex;
+            align-items: center;
+            width: 100%;
+            border: none;
+            background: none;
+            text-align: left;
+            color: #333;
+            line-height: 1.4;
+            min-height: 44px;
+            box-sizing: border-box;
+            position: relative;
         }
 
         .context-menu-item:hover {
             background: #f8f9fa;
+            color: #333;
+            transform: translateX(2px);
         }
 
         .context-menu-item.danger:hover {
             background: #ffebee;
             color: #d32f2f;
+            transform: translateX(2px);
+        }
+
+        .context-menu-item:active {
+            background: #e9ecef;
+            transform: translateX(0px);
+        }
+
+        .context-menu-item:focus {
+            outline: 2px solid #4CAF50;
+            outline-offset: -2px;
         }
 
         .modal {
@@ -683,6 +712,97 @@
         .empty-state-text {
             font-size: 1.2em;
             margin-bottom: 30px;
+        }
+
+        /* 成员详情样式 */
+        .member-details {
+            padding: 20px;
+        }
+
+        .detail-section {
+            margin-bottom: 25px;
+        }
+
+        .detail-section h3 {
+            color: #333;
+            margin-bottom: 15px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #f0f0f0;
+            font-size: 1.1em;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .detail-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 0;
+        }
+
+        .detail-item label {
+            font-weight: 600;
+            color: #555;
+            min-width: 80px;
+            margin-right: 10px;
+        }
+
+        .detail-item span {
+            color: #333;
+            flex: 1;
+        }
+
+        .notes-content {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #4CAF50;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .detail-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 1px solid #f0f0f0;
+        }
+
+        .detail-actions .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .detail-actions .btn-primary {
+            background: #4CAF50;
+            color: white;
+        }
+
+        .detail-actions .btn-primary:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+        }
+
+        .detail-actions .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .detail-actions .btn-secondary:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
         }
 
         /* 传统族谱布局样式 */
@@ -1013,8 +1133,22 @@
             document.getElementById('searchInput').addEventListener('focus', handleSearchFocus);
             document.getElementById('searchInput').addEventListener('blur', handleSearchBlur);
             
-            // 点击空白处关闭搜索结果和右键菜单
+            // 统一的点击事件处理
             document.addEventListener('click', function(e) {
+                // 处理树节点点击（查看详细信息）
+                if (e.target.closest('.tree-node')) {
+                    const nodeElement = e.target.closest('.tree-node');
+                    if (nodeElement && nodeElement.dataset && nodeElement.dataset.id) {
+                        const nodeId = parseInt(nodeElement.dataset.id);
+                        console.log('左键点击事件：获取到节点ID:', nodeId);
+                        selectNode(nodeId);
+                    } else {
+                        console.error('左键点击事件：无法获取节点ID', nodeElement);
+                    }
+                    return; // 阻止后续处理
+                }
+                
+                // 点击空白处关闭搜索结果和右键菜单
                 if (!e.target.closest('.search-container')) {
                     document.getElementById('searchResults').style.display = 'none';
                 }
@@ -1664,7 +1798,7 @@
             const lifeSpan = birthYear ? (deathYear ? `${birthYear}-${deathYear}` : `${birthYear}-`) : '';
             
             return `
-                <div class="tree-node ${nodeClass}${compactClass}" data-id="${individual.individual_id}" onclick="selectNode(${individual.individual_id})">
+                <div class="tree-node ${nodeClass}${compactClass}" data-id="${individual.individual_id}">
                     <div class="node-name">${individual.full_name}</div>
                     ${!compact ? `
                         <div class="node-details">${individual.gender === 'male' ? '♂' : '♀'} ${label}</div>
@@ -1679,10 +1813,105 @@
 
         // 选择节点
         function selectNode(nodeId) {
+            console.log('selectNode 被调用，nodeId:', nodeId);
             selectedNodeId = nodeId;
-            // 重新渲染以显示选中状态
-            if (currentRootId) {
-                showFamilyTree(currentRootId);
+            // 显示成员详细信息
+            showMemberDetails(nodeId);
+        }
+
+        // 显示成员详细信息
+        async function showMemberDetails(memberId) {
+            try {
+                // 首先尝试从allMembers中查找
+                let member = allMembers.find(m => m.individual_id === memberId);
+                
+                // 如果在allMembers中找不到，从API获取
+                if (!member) {
+                    const response = await fetch(`/api/v1/individuals/${memberId}?_=${Date.now()}`, {
+                        headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+                    });
+                    const data = await response.json();
+                    
+                    if (data.success && data.data) {
+                        member = data.data;
+                    } else {
+                        showNotification('无法获取成员信息', 'error');
+                        return;
+                    }
+                }
+                
+                // 构建详细信息HTML
+                const detailsHtml = `
+                    <div class="member-details">
+                        <div class="detail-section">
+                            <h3>👤 基本信息</h3>
+                            <div class="detail-grid">
+                                <div class="detail-item">
+                                    <label>姓名：</label>
+                                    <span>${member.full_name}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>性别：</label>
+                                    <span>${member.gender === 'male' ? '♂ 男' : '♀ 女'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>出生日期：</label>
+                                    <span>${member.birth_date ? formatDate(member.birth_date) : '未知'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>死亡日期：</label>
+                                    <span>${member.death_date ? formatDate(member.death_date) : '在世'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>职业：</label>
+                                    <span>${member.occupation || '未知'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>出生地：</label>
+                                    <span>${member.birth_place || '未知'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        ${member.notes ? `
+                        <div class="detail-section">
+                            <h3>📝 备注信息</h3>
+                            <div class="notes-content">${member.notes}</div>
+                        </div>
+                        ` : ''}
+                        
+                        <div class="detail-section">
+                            <h3>🌳 家族关系</h3>
+                            <div class="detail-grid">
+                                <div class="detail-item">
+                                    <label>父亲ID：</label>
+                                    <span>${member.father_id || '未知'}</span>
+                                </div>
+                                <div class="detail-item">
+                                    <label>母亲ID：</label>
+                                    <span>${member.mother_id || '未知'}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="detail-actions">
+                            <button class="btn btn-primary" onclick="showFamilyTree(${member.individual_id})">
+                                <i class="fas fa-sitemap"></i> 查看家族树
+                            </button>
+                            <button class="btn btn-secondary" onclick="closeDetailsModal()">
+                                <i class="fas fa-times"></i> 关闭
+                            </button>
+                        </div>
+                    </div>
+                `;
+                
+                // 显示模态框
+                document.getElementById('detailsContent').innerHTML = detailsHtml;
+                document.getElementById('detailsModal').style.display = 'block';
+                
+            } catch (error) {
+                console.error('获取成员详细信息失败:', error);
+                showNotification('获取成员信息失败', 'error');
             }
         }
 
@@ -1713,11 +1942,62 @@
                 return;
             }
             
+            // 先显示菜单以获取其尺寸，但放在屏幕外
             menu.style.display = 'block';
-            menu.style.left = event.pageX + 'px';
-            menu.style.top = event.pageY + 'px';
+            menu.style.left = '-9999px';
+            menu.style.top = '-9999px';
+            menu.style.visibility = 'visible';
             
-            console.log('右键菜单已显示在位置:', event.pageX, event.pageY);
+            // 强制重新计算布局
+            menu.offsetHeight;
+            
+            // 获取菜单尺寸和窗口尺寸
+            const menuRect = menu.getBoundingClientRect();
+            const windowWidth = window.innerWidth;
+            const windowHeight = window.innerHeight;
+            const scrollX = window.pageXOffset || document.documentElement.scrollLeft;
+            const scrollY = window.pageYOffset || document.documentElement.scrollTop;
+            
+            console.log('菜单尺寸:', menuRect.width, 'x', menuRect.height);
+            console.log('窗口尺寸:', windowWidth, 'x', windowHeight);
+            console.log('鼠标位置:', event.clientX, event.clientY);
+            console.log('页面滚动:', scrollX, scrollY);
+            
+            // 计算最佳位置（使用clientX/Y，因为菜单是fixed定位）
+            let left = event.clientX;
+            let top = event.clientY;
+            
+            const margin = 15; // 边距
+            
+            // 检查右边界 - 如果菜单会超出右边，则向左调整
+            if (left + menuRect.width + margin > windowWidth) {
+                left = Math.max(margin, windowWidth - menuRect.width - margin);
+                console.log('调整右边界，新left:', left);
+            }
+            
+            // 检查下边界 - 如果菜单会超出下边，则向上调整
+            if (top + menuRect.height + margin > windowHeight) {
+                top = Math.max(margin, windowHeight - menuRect.height - margin);
+                console.log('调整下边界，新top:', top);
+            }
+            
+            // 检查左边界
+            if (left < margin) {
+                left = margin;
+                console.log('调整左边界，新left:', left);
+            }
+            
+            // 检查上边界
+            if (top < margin) {
+                top = margin;
+                console.log('调整上边界，新top:', top);
+            }
+            
+            // 设置最终位置
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+            
+            console.log('右键菜单最终位置:', left, top, '菜单尺寸:', menuRect.width, menuRect.height);
         }
 
         // 更改显示代数
