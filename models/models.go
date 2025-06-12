@@ -221,6 +221,22 @@ type CreateFamilyRequest struct {
 	Notes           string     `json:"notes"`
 }
 
+// AddParentRequest 添加父母请求
+type AddParentRequest struct {
+	FullName     string     `json:"full_name" binding:"required"`
+	ParentType   string     `json:"parent_type" binding:"required"` // "father" 或 "mother"
+	Gender       Gender     `json:"gender"`
+	BirthDate    *time.Time `json:"birth_date"`
+	BirthPlace   string     `json:"birth_place"`
+	BirthPlaceID *int       `json:"birth_place_id"`
+	DeathDate    *time.Time `json:"death_date"`
+	DeathPlace   string     `json:"death_place"`
+	DeathPlaceID *int       `json:"death_place_id"`
+	Occupation   string     `json:"occupation"`
+	Notes        string     `json:"notes"`
+	PhotoURL     *string    `json:"photo_url"`
+}
+
 // FamilyTreeNode 家族树节点
 type FamilyTreeNode struct {
 	Individual *Individual      `json:"individual"`

@@ -562,3 +562,261 @@ func (s *IndividualService) GetFamilyTree(ctx context.Context, rootID int, gener
 
 	return node, nil
 }
+
+// AddParent 向上添加父母
+func (s *IndividualService) AddParent(ctx context.Context, childID int, req *models.AddParentRequest) (*models.Individual, error) {
+	if childID <= 0 {
+		return nil, fmt.Errorf("无效的子女ID")
+	}
+
+	if req.FullName == "" {
+		return nil, fmt.Errorf("父母姓名不能为空")
+	}
+
+	// 验证父母类型
+	if req.ParentType != "father" && req.ParentType != "mother" {
+		return nil, fmt.Errorf("父母类型必须是 'father' 或 'mother'")
+	}
+
+	// 获取子女信息
+	child, err := s.repo.GetIndividualByID(ctx, childID)
+	if err != nil {
+		return nil, fmt.Errorf("获取子女信息失败: %v", err)
+	}
+
+	// 检查是否已经有对应的父母
+	if req.ParentType == "father" && child.FatherID != nil {
+		return nil, fmt.Errorf("该子女已经有父亲了")
+	}
+	if req.ParentType == "mother" && child.MotherID != nil {
+		return nil, fmt.Errorf("该子女已经有母亲了")
+	}
+
+	// 根据父母类型设置性别
+	if req.ParentType == "father" {
+		req.Gender = models.GenderMale
+	} else {
+		req.Gender = models.GenderFemale
+	}
+
+	// 创建父母个人信息
+	parent := &models.Individual{
+		FullName:     req.FullName,
+		Gender:       req.Gender,
+		BirthDate:    req.BirthDate,
+		BirthPlace:   req.BirthPlace,
+		BirthPlaceID: req.BirthPlaceID,
+		DeathDate:    req.DeathDate,
+		DeathPlace:   req.DeathPlace,
+		DeathPlaceID: req.DeathPlaceID,
+		Occupation:   req.Occupation,
+		Notes:        req.Notes,
+		PhotoURL:     req.PhotoURL,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	// 创建父母记录
+	createdParent, err := s.repo.CreateIndividual(ctx, parent)
+	if err != nil {
+		return nil, fmt.Errorf("创建父母记录失败: %v", err)
+	}
+
+	// 获取所有兄弟姐妹（包括当前子女）
+	siblings, err := s.findSiblingsForParentUpdate(ctx, childID)
+	if err != nil {
+		// 如果获取兄弟姐妹失败，至少更新当前子女
+		siblings = []models.Individual{*child}
+		fmt.Printf("警告: 获取兄弟姐妹失败，只更新当前子女: %v\n", err)
+	}
+
+	// 更新所有兄弟姐妹的父母关系
+	var failedUpdates []string
+	for _, sibling := range siblings {
+		updateReq := &models.UpdateIndividualRequest{
+			FullName:     &sibling.FullName,
+			Gender:       &sibling.Gender,
+			BirthDate:    sibling.BirthDate,
+			BirthPlace:   &sibling.BirthPlace,
+			BirthPlaceID: sibling.BirthPlaceID,
+			DeathDate:    sibling.DeathDate,
+			DeathPlace:   &sibling.DeathPlace,
+			DeathPlaceID: sibling.DeathPlaceID,
+			Occupation:   &sibling.Occupation,
+			Notes:        &sibling.Notes,
+			PhotoURL:     sibling.PhotoURL,
+			FatherID:     sibling.FatherID,
+			MotherID:     sibling.MotherID,
+		}
+
+		if req.ParentType == "father" {
+			updateReq.FatherID = &createdParent.IndividualID
+		} else {
+			updateReq.MotherID = &createdParent.IndividualID
+		}
+
+		_, err = s.Update(ctx, sibling.IndividualID, updateReq)
+		if err != nil {
+			failedUpdates = append(failedUpdates, fmt.Sprintf("%s(ID:%d)", sibling.FullName, sibling.IndividualID))
+			fmt.Printf("警告: 更新%s的父母关系失败: %v\n", sibling.FullName, err)
+		}
+	}
+
+	// 如果有更新失败的情况，记录但不回滚
+	if len(failedUpdates) > 0 {
+		fmt.Printf("警告: 以下成员的父母关系更新失败: %v\n", failedUpdates)
+	}
+
+	// 检查并创建父母之间的夫妻关系
+	err = s.ensureParentsMarriageForAllSiblings(ctx, siblings)
+	if err != nil {
+		// 记录警告但不影响主要操作
+		fmt.Printf("警告: 创建父母夫妻关系失败: %v\n", err)
+	}
+
+	return createdParent, nil
+}
+
+// findSiblingsForParentUpdate 查找需要更新父母关系的所有兄弟姐妹
+func (s *IndividualService) findSiblingsForParentUpdate(ctx context.Context, childID int) ([]models.Individual, error) {
+	child, err := s.repo.GetIndividualByID(ctx, childID)
+	if err != nil {
+		return nil, err
+	}
+
+	var allSiblings []models.Individual
+	siblingMap := make(map[int]bool) // 用于去重
+
+	// 添加当前子女
+	allSiblings = append(allSiblings, *child)
+	siblingMap[child.IndividualID] = true
+
+	// 如果有父亲，获取所有同父兄弟姐妹
+	if child.FatherID != nil {
+		fatherChildren, err := s.repo.GetIndividualsByParentID(ctx, *child.FatherID)
+		if err == nil {
+			for _, sibling := range fatherChildren {
+				if !siblingMap[sibling.IndividualID] {
+					allSiblings = append(allSiblings, sibling)
+					siblingMap[sibling.IndividualID] = true
+				}
+			}
+		}
+	}
+
+	// 如果有母亲，获取所有同母兄弟姐妹
+	if child.MotherID != nil {
+		motherChildren, err := s.repo.GetIndividualsByParentID(ctx, *child.MotherID)
+		if err == nil {
+			for _, sibling := range motherChildren {
+				if !siblingMap[sibling.IndividualID] {
+					allSiblings = append(allSiblings, sibling)
+					siblingMap[sibling.IndividualID] = true
+				}
+			}
+		}
+	}
+
+	return allSiblings, nil
+}
+
+// ensureParentsMarriageForAllSiblings 确保所有兄弟姐妹的父母之间有夫妻关系
+func (s *IndividualService) ensureParentsMarriageForAllSiblings(ctx context.Context, siblings []models.Individual) error {
+	if len(siblings) == 0 {
+		return nil
+	}
+
+	// 获取第一个兄弟姐妹的父母信息作为参考
+	var fatherID, motherID *int
+	for _, sibling := range siblings {
+		if sibling.FatherID != nil && sibling.MotherID != nil {
+			fatherID = sibling.FatherID
+			motherID = sibling.MotherID
+			break
+		}
+	}
+
+	// 如果没有找到完整的父母信息，尝试从所有兄弟姐妹中收集
+	if fatherID == nil || motherID == nil {
+		for _, sibling := range siblings {
+			if fatherID == nil && sibling.FatherID != nil {
+				fatherID = sibling.FatherID
+			}
+			if motherID == nil && sibling.MotherID != nil {
+				motherID = sibling.MotherID
+			}
+			if fatherID != nil && motherID != nil {
+				break
+			}
+		}
+	}
+
+	// 如果仍然没有完整的父母信息，无法创建夫妻关系
+	if fatherID == nil || motherID == nil {
+		return fmt.Errorf("无法找到完整的父母信息来创建夫妻关系")
+	}
+
+	// 检查父母之间是否已经有夫妻关系
+	families, err := s.familyRepo.GetFamiliesByIndividualID(ctx, *fatherID)
+	if err != nil {
+		return fmt.Errorf("检查现有夫妻关系失败: %v", err)
+	}
+
+	// 检查是否已存在夫妻关系
+	for _, family := range families {
+		if family.HusbandID != nil && *family.HusbandID == *fatherID &&
+			family.WifeID != nil && *family.WifeID == *motherID {
+			// 夫妻关系已存在
+			return nil
+		}
+	}
+
+	// 获取下一个婚姻顺序
+	marriageOrder, err := s.getNextMarriageOrder(ctx, *fatherID)
+	if err != nil {
+		return fmt.Errorf("获取婚姻顺序失败: %v", err)
+	}
+
+	// 创建夫妻关系
+	familyReq := &models.CreateFamilyRequest{
+		HusbandID: fatherID,
+		WifeID:    motherID,
+	}
+
+	family := &models.Family{
+		HusbandID:     familyReq.HusbandID,
+		WifeID:        familyReq.WifeID,
+		MarriageOrder: marriageOrder,
+		MarriageDate:  familyReq.MarriageDate,
+		DivorceDate:   familyReq.DivorceDate,
+		Notes:         familyReq.Notes,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
+	}
+
+	_, err = s.familyRepo.CreateFamily(ctx, family)
+	if err != nil {
+		return fmt.Errorf("创建夫妻关系失败: %v", err)
+	}
+
+	return nil
+}
+
+// getNextMarriageOrder 获取下一个婚姻顺序
+func (s *IndividualService) getNextMarriageOrder(ctx context.Context, husbandID int) (int, error) {
+	families, err := s.familyRepo.GetFamiliesByIndividualID(ctx, husbandID)
+	if err != nil {
+		return 1, err
+	}
+
+	maxOrder := 0
+	for _, family := range families {
+		if family.HusbandID != nil && *family.HusbandID == husbandID {
+			if family.MarriageOrder > maxOrder {
+				maxOrder = family.MarriageOrder
+			}
+		}
+	}
+
+	return maxOrder + 1, nil
+}

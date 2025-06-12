@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
-	"net/http"
-	"strconv"
 	"familytree/interfaces"
 	"familytree/models"
+	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 )
@@ -161,7 +161,7 @@ func (h *IndividualHandler) SearchIndividuals(w http.ResponseWriter, r *http.Req
 	if query == "" {
 		query = r.URL.Query().Get("q")
 	}
-	
+
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
 
@@ -417,4 +417,41 @@ func (h *IndividualHandler) GetFamilyTree(w http.ResponseWriter, r *http.Request
 		Success: true,
 		Data:    tree,
 	})
-} 
+}
+
+// AddParent 向上添加父母
+func (h *IndividualHandler) AddParent(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	childID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的子女ID",
+		})
+		return
+	}
+
+	var req models.AddParentRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "请求数据格式错误",
+		})
+		return
+	}
+
+	parent, err := h.service.AddParent(r.Context(), childID, &req)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, APIResponse{
+		Success: true,
+		Data:    parent,
+		Message: "父母添加成功",
+	})
+}

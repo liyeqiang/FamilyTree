@@ -439,6 +439,9 @@ func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *h
 	// 配偶关系路由
 	individuals.HandleFunc("/{id:[0-9]+}/add-spouse", familyHandler.AddSpouse).Methods("POST")
 
+	// 添加父母路由
+	individuals.HandleFunc("/{id:[0-9]+}/add-parent", individualHandler.AddParent).Methods("POST")
+
 	// 家庭关系路由
 	families := router.PathPrefix("/api/v1/families").Subrouter()
 	families.HandleFunc("/husband/{id:[0-9]+}", familyHandler.GetFamiliesByHusband).Methods("GET")
