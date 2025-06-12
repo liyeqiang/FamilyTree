@@ -85,7 +85,7 @@ func (r *SQLiteRepository) UpdateIndividual(ctx context.Context, id int, individ
 	query := `
 		UPDATE individuals SET 
 		full_name = ?, gender = ?, birth_date = ?, birth_place_id = ?, death_date = ?,
-		death_place_id = ?, occupation = ?, notes = ?, photo_url = ?, father_id = ?, mother_id = ?
+		death_place_id = ?, occupation = ?, notes = ?, photo_url = ?, father_id = ?, mother_id = ?, updated_at = ?
 		WHERE individual_id = ?
 	`
 
@@ -93,7 +93,7 @@ func (r *SQLiteRepository) UpdateIndividual(ctx context.Context, id int, individ
 		individual.FullName, individual.Gender, individual.BirthDate,
 		individual.BirthPlaceID, individual.DeathDate, individual.DeathPlaceID,
 		individual.Occupation, individual.Notes, individual.PhotoURL,
-		individual.FatherID, individual.MotherID, id)
+		individual.FatherID, individual.MotherID, time.Now(), id)
 
 	if err != nil {
 		return nil, fmt.Errorf("更新个人信息失败: %v", err)

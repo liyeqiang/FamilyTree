@@ -144,15 +144,30 @@ func (s *FamilyService) Delete(ctx context.Context, id int) error {
 		return fmt.Errorf("无效的家庭ID")
 	}
 
+	// 检查家庭关系是否存在
+	_, err := s.repo.GetFamilyByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("家庭关系不存在")
+	}
+
 	// 检查是否有子女记录
 	children, err := s.repo.GetChildrenByFamilyID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("检查子女关系失败: %v", err)
 	}
 	if len(children) > 0 {
-		return fmt.Errorf("该家庭有子女记录，不能删除")
+		return fmt.Errorf("该家庭有子女记录，不能删除。请先删除或转移子女关系")
 	}
 
+	// 先清理所有相关的子女关系记录
+	for _, child := range children {
+		err := s.repo.DeleteChild(ctx, id, child.IndividualID)
+		if err != nil {
+			return fmt.Errorf("删除子女关系记录失败: %v", err)
+		}
+	}
+
+	// 删除家庭关系
 	return s.repo.DeleteFamily(ctx, id)
 }
 

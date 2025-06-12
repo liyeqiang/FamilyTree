@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试添加子女功能</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        button { padding: 10px 15px; margin: 5px; cursor: pointer; }
+        .result { margin: 10px 0; padding: 10px; background: #f5f5f5; }
+        .error { background: #ffebee; color: #c62828; }
+        .success { background: #e8f5e8; color: #2e7d32; }
+        .family-tree { margin: 20px 0; }
+        .tree-node { 
+            display: inline-block; 
+            margin: 10px; 
+            padding: 10px; 
+            border: 1px solid #ccc; 
+            background: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <h1>家谱系统 - 添加子女功能测试</h1>
+    
+    <div class="test-section">
+        <h2>1. 获取所有成员</h2>
+        <button onclick="loadMembers()">加载成员列表</button>
+        <div id="membersResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>2. 添加子女测试</h2>
+        <p>选择父亲：</p>
+        <select id="fatherSelect">
+            <option value="">请选择父亲</option>
+        </select>
+        <p>选择母亲：</p>
+        <select id="motherSelect">
+            <option value="">请选择母亲</option>
+        </select>
+        <p>子女信息：</p>
+        <input type="text" id="childName" placeholder="子女姓名" />
+        <select id="childGender">
+            <option value="male">男</option>
+            <option value="female">女</option>
+        </select>
+        <br><br>
+        <button onclick="addChild()">添加子女</button>
+        <div id="addChildResult" class="result"></div>
+    </div>
+    
+    <div class="test-section">
+        <h2>3. 查看家族树</h2>
+        <select id="rootSelect">
+            <option value="">选择根节点</option>
+        </select>
+        <button onclick="showFamilyTree()">显示家族树</button>
+        <div id="familyTreeResult" class="result"></div>
+    </div>
+
+    <script>
+        let allMembers = [];
+        
+        async function loadMembers() {
+            try {
+                const response = await fetch('/api/v1/individuals?_=' + Date.now());
+                const data = await response.json();
+                
+                if (data.success) {
+                    allMembers = data.data || [];
+                    document.getElementById('membersResult').innerHTML = 
+                        `<div class="success">成功加载 ${allMembers.length} 个成员</div>`;
+                    
+                    // 更新选择框
+                    updateSelects();
+                } else {
+                    document.getElementById('membersResult').innerHTML = 
+                        `<div class="error">加载失败: ${data.message}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('membersResult').innerHTML = 
+                    `<div class="error">网络错误: ${error.message}</div>`;
+            }
+        }
+        
+        function updateSelects() {
+            const fatherSelect = document.getElementById('fatherSelect');
+            const motherSelect = document.getElementById('motherSelect');
+            const rootSelect = document.getElementById('rootSelect');
+            
+            // 清空选项
+            fatherSelect.innerHTML = '<option value="">请选择父亲</option>';
+            motherSelect.innerHTML = '<option value="">请选择母亲</option>';
+            rootSelect.innerHTML = '<option value="">选择根节点</option>';
+            
+            allMembers.forEach(member => {
+                const option = `<option value="${member.individual_id}">${member.full_name} (${member.gender === 'male' ? '男' : '女'})</option>`;
+                
+                if (member.gender === 'male') {
+                    fatherSelect.innerHTML += option;
+                }
+                if (member.gender === 'female') {
+                    motherSelect.innerHTML += option;
+                }
+                rootSelect.innerHTML += option;
+            });
+        }
+        
+        async function addChild() {
+            const fatherId = document.getElementById('fatherSelect').value;
+            const motherId = document.getElementById('motherSelect').value;
+            const childName = document.getElementById('childName').value;
+            const childGender = document.getElementById('childGender').value;
+            
+            if (!childName) {
+                document.getElementById('addChildResult').innerHTML = 
+                    '<div class="error">请输入子女姓名</div>';
+                return;
+            }
+            
+            const childData = {
+                full_name: childName,
+                gender: childGender,
+                father_id: fatherId ? parseInt(fatherId) : null,
+                mother_id: motherId ? parseInt(motherId) : null
+            };
+            
+            try {
+                const response = await fetch('/api/v1/individuals', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(childData)
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    document.getElementById('addChildResult').innerHTML = 
+                        `<div class="success">子女添加成功！ID: ${data.data.individual_id}</div>`;
+                    
+                    // 重新加载成员列表
+                    await loadMembers();
+                } else {
+                    document.getElementById('addChildResult').innerHTML = 
+                        `<div class="error">添加失败: ${data.message}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('addChildResult').innerHTML = 
+                    `<div class="error">网络错误: ${error.message}</div>`;
+            }
+        }
+        
+        async function showFamilyTree() {
+            const rootId = document.getElementById('rootSelect').value;
+            if (!rootId) {
+                document.getElementById('familyTreeResult').innerHTML = 
+                    '<div class="error">请选择根节点</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/individuals/${rootId}/family-tree?generations=3&_=${Date.now()}`);
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    const treeHtml = renderTreeNode(data.data, 0);
+                    document.getElementById('familyTreeResult').innerHTML = 
+                        `<div class="success">家族树加载成功</div><div class="family-tree">${treeHtml}</div>`;
+                } else {
+                    document.getElementById('familyTreeResult').innerHTML = 
+                        `<div class="error">加载家族树失败: ${data.message || '未知错误'}</div>`;
+                }
+            } catch (error) {
+                document.getElementById('familyTreeResult').innerHTML = 
+                    `<div class="error">网络错误: ${error.message}</div>`;
+            }
+        }
+        
+        function renderTreeNode(node, level) {
+            if (!node || !node.individual) return '';
+            
+            const individual = node.individual;
+            const indent = '&nbsp;'.repeat(level * 4);
+            
+            let html = `
+                <div class="tree-node" style="margin-left: ${level * 20}px;">
+                    ${individual.full_name} (${individual.gender === 'male' ? '男' : '女'})
+                    ${individual.birth_date ? ' - ' + new Date(individual.birth_date).getFullYear() : ''}
+                </div>
+            `;
+            
+            if (node.children && node.children.length > 0) {
+                node.children.forEach(child => {
+                    html += renderTreeNode(child, level + 1);
+                });
+            }
+            
+            return html;
+        }
+        
+        // 页面加载时自动加载成员
+        window.onload = function() {
+            loadMembers();
+        };
+    </script>
+</body>
+</html> 

@@ -30,6 +30,11 @@ func (s *IndividualService) Create(ctx context.Context, req *models.CreateIndivi
 		return nil, fmt.Errorf("姓名不能为空")
 	}
 
+	// 验证父母关系
+	if req.FatherID != nil && req.MotherID != nil && *req.FatherID == *req.MotherID {
+		return nil, fmt.Errorf("父亲和母亲不能是同一个人")
+	}
+
 	// 如果指定了父亲，验证父亲存在且为男性
 	if req.FatherID != nil {
 		father, err := s.repo.GetIndividualByID(ctx, *req.FatherID)
@@ -50,7 +55,7 @@ func (s *IndividualService) Create(ctx context.Context, req *models.CreateIndivi
 				return nil, fmt.Errorf("指定的母亲必须是女性")
 			}
 
-			// 验证父母是否已婚
+			// 验证父母是否已婚，如果没有则自动创建婚姻关系
 			families, err := s.familyRepo.GetFamiliesByIndividualID(ctx, *req.FatherID)
 			if err != nil {
 				return nil, fmt.Errorf("验证父母婚姻关系失败: %v", err)
@@ -65,8 +70,30 @@ func (s *IndividualService) Create(ctx context.Context, req *models.CreateIndivi
 				}
 			}
 
+			// 如果父母未建立婚姻关系，自动创建
 			if !married {
-				return nil, fmt.Errorf("指定的父母未建立婚姻关系")
+				// 获取父亲的下一个婚姻顺序
+				marriageOrder := 1
+				for _, family := range families {
+					if family.HusbandID != nil && *family.HusbandID == *req.FatherID {
+						if family.MarriageOrder >= marriageOrder {
+							marriageOrder = family.MarriageOrder + 1
+						}
+					}
+				}
+
+				// 创建婚姻关系
+				newFamily := &models.Family{
+					HusbandID:     req.FatherID,
+					WifeID:        req.MotherID,
+					MarriageOrder: marriageOrder,
+					Notes:         "系统自动创建的婚姻关系",
+				}
+
+				_, err := s.familyRepo.CreateFamily(ctx, newFamily)
+				if err != nil {
+					return nil, fmt.Errorf("创建父母婚姻关系失败: %v", err)
+				}
 			}
 		}
 	} else if req.MotherID != nil {
@@ -100,7 +127,37 @@ func (s *IndividualService) Create(ctx context.Context, req *models.CreateIndivi
 		UpdatedAt:    time.Now(),
 	}
 
-	return s.repo.CreateIndividual(ctx, individual)
+	createdIndividual, err := s.repo.CreateIndividual(ctx, individual)
+	if err != nil {
+		return nil, err
+	}
+
+	// 如果有父母，创建子女关系记录
+	if req.FatherID != nil && req.MotherID != nil {
+		// 查找父母的家庭关系
+		families, err := s.familyRepo.GetFamiliesByIndividualID(ctx, *req.FatherID)
+		if err == nil {
+			for _, family := range families {
+				if family.HusbandID != nil && *family.HusbandID == *req.FatherID &&
+					family.WifeID != nil && *family.WifeID == *req.MotherID {
+					// 创建子女关系记录
+					child := &models.Child{
+						FamilyID:               family.FamilyID,
+						IndividualID:           createdIndividual.IndividualID,
+						RelationshipToParents:  "生子",
+					}
+					if createdIndividual.Gender == models.GenderFemale {
+						child.RelationshipToParents = "生女"
+					}
+					
+					s.familyRepo.CreateChild(ctx, child)
+					break
+				}
+			}
+		}
+	}
+
+	return createdIndividual, nil
 }
 
 // GetByID 根据ID获取个人信息
@@ -118,7 +175,7 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 	}
 
 	// 验证输入
-	if req.FullName == nil || *req.FullName == "" {
+	if req.FullName != nil && *req.FullName == "" {
 		return nil, fmt.Errorf("姓名不能为空")
 	}
 
@@ -133,6 +190,18 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 	// 验证父母关系
 	if req.FatherID != nil && req.MotherID != nil && *req.FatherID == *req.MotherID {
 		return nil, fmt.Errorf("父亲和母亲不能是同一个人")
+	}
+
+	// 验证循环关系 - 防止A的父亲是B，B的父亲是A这种情况
+	if req.FatherID != nil {
+		if err := s.validateNoCircularRelationship(ctx, id, *req.FatherID, "父亲"); err != nil {
+			return nil, err
+		}
+	}
+	if req.MotherID != nil {
+		if err := s.validateNoCircularRelationship(ctx, id, *req.MotherID, "母亲"); err != nil {
+			return nil, err
+		}
 	}
 
 	// 验证父亲性别
@@ -185,8 +254,11 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 				FullName:     child.FullName,
 				Gender:       child.Gender,
 				BirthDate:    child.BirthDate,
+				BirthPlace:   child.BirthPlace,
 				BirthPlaceID: child.BirthPlaceID,
 				DeathDate:    child.DeathDate,
+				DeathPlace:   child.DeathPlace,
+				BurialPlace:  child.BurialPlace,
 				DeathPlaceID: child.DeathPlaceID,
 				Occupation:   child.Occupation,
 				Notes:        child.Notes,
@@ -219,6 +291,7 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 		}
 	}
 
+	// 合并更新字段
 	if req.FatherID == nil {
 		req.FatherID = current.FatherID
 	}
@@ -283,6 +356,48 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 	return s.repo.UpdateIndividual(ctx, id, individual)
 }
 
+// validateNoCircularRelationship 验证不存在循环关系
+func (s *IndividualService) validateNoCircularRelationship(ctx context.Context, childID, parentID int, parentType string) error {
+	visited := make(map[int]bool)
+	
+	var checkAncestors func(int) error
+	checkAncestors = func(currentID int) error {
+		if visited[currentID] {
+			return fmt.Errorf("检测到循环关系：不能将此人设为%s，因为会形成循环父母关系", parentType)
+		}
+		
+		if currentID == childID {
+			return fmt.Errorf("检测到循环关系：不能将此人设为%s，因为会形成循环父母关系", parentType)
+		}
+		
+		visited[currentID] = true
+		
+		// 获取当前人的父母
+		individual, err := s.repo.GetIndividualByID(ctx, currentID)
+		if err != nil {
+			return nil // 如果获取失败，忽略（可能是数据不存在）
+		}
+		
+		// 递归检查父亲
+		if individual.FatherID != nil {
+			if err := checkAncestors(*individual.FatherID); err != nil {
+				return err
+			}
+		}
+		
+		// 递归检查母亲
+		if individual.MotherID != nil {
+			if err := checkAncestors(*individual.MotherID); err != nil {
+				return err
+			}
+		}
+		
+		return nil
+	}
+	
+	return checkAncestors(parentID)
+}
+
 // 辅助函数：获取字符串指针的值或默认值
 func getStringValue(ptr *string, defaultValue string) string {
 	if ptr != nil {
@@ -313,15 +428,54 @@ func (s *IndividualService) Delete(ctx context.Context, id int) error {
 		return fmt.Errorf("无效的个人ID")
 	}
 
+	// 检查个人是否存在
+	_, err := s.repo.GetIndividualByID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("个人信息不存在")
+	}
+
 	// 检查是否有子女
 	children, err := s.repo.GetIndividualsByParentID(ctx, id)
 	if err != nil {
 		return fmt.Errorf("检查子女关系失败: %v", err)
 	}
 	if len(children) > 0 {
-		return fmt.Errorf("该个人有子女记录，不能删除")
+		return fmt.Errorf("该个人有子女记录，不能删除。请先删除或转移其子女关系")
 	}
 
+	// 检查是否作为配偶存在于家庭关系中
+	families, err := s.familyRepo.GetFamiliesByIndividualID(ctx, id)
+	if err != nil {
+		return fmt.Errorf("检查家庭关系失败: %v", err)
+	}
+	if len(families) > 0 {
+		return fmt.Errorf("该个人仍存在于家庭关系中，不能删除。请先删除相关的家庭关系")
+	}
+
+	// 检查其他人是否将此人设为父亲或母亲
+	// 通过查询所有个人信息来检查father_id和mother_id字段
+	allIndividuals, _, err := s.repo.SearchIndividuals(ctx, "", 10000, 0) // 获取大量数据来检查
+	if err != nil {
+		return fmt.Errorf("检查父母关系失败: %v", err)
+	}
+	
+	for _, person := range allIndividuals {
+		if (person.FatherID != nil && *person.FatherID == id) ||
+		   (person.MotherID != nil && *person.MotherID == id) {
+			return fmt.Errorf("该个人被其他人设置为父亲或母亲，不能删除。请先调整相关的父母关系")
+		}
+	}
+
+	// 清理该人作为子女的记录（从子女关系表中删除）
+	for _, family := range families {
+		err := s.familyRepo.DeleteChild(ctx, family.FamilyID, id)
+		if err != nil {
+			// 如果删除失败，记录但不阻止整个删除操作
+			fmt.Printf("警告：清理子女关系记录失败: %v\n", err)
+		}
+	}
+
+	// 执行删除
 	return s.repo.DeleteIndividual(ctx, id)
 }
 

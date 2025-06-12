@@ -331,6 +331,35 @@ func (r *DemoRepository) GetChildrenByFamilyID(ctx context.Context, familyID int
 	return children, nil
 }
 
+// BuildFamilyTree 构建家族树
+func (r *DemoRepository) BuildFamilyTree(ctx context.Context, rootID int, generations int) (*models.FamilyTreeNode, error) {
+	individual, err := r.GetIndividualByID(ctx, rootID)
+	if err != nil {
+		return nil, err
+	}
+
+	node := &models.FamilyTreeNode{
+		Individual: individual,
+	}
+
+	if generations > 0 {
+		children, err := r.GetIndividualsByParentID(ctx, rootID)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, child := range children {
+			childNode, err := r.BuildFamilyTree(ctx, child.IndividualID, generations-1)
+			if err != nil {
+				return nil, err
+			}
+			node.Children = append(node.Children, *childNode)
+		}
+	}
+
+	return node, nil
+}
+
 func main() {
 	// 检查命令行参数
 	mode := "demo"
