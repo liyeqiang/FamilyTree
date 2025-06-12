@@ -1281,8 +1281,8 @@
             const levels = [];
             const rootLevel = 1; // 根节点在第1层
             
-            // 第0层：父母
-            if (rootData.parents && rootData.parents.length > 0) {
+            // 第0层：父母（只有在代数设置允许时才显示）
+            if (rootData.parents && rootData.parents.length > 0 && currentGenerations > 1) {
                 const parentMembers = [];
                 for (const parent of rootData.parents) {
                     parentMembers.push({
@@ -1316,7 +1316,7 @@
                 levels.push({ members: parentMembers, generation: -1 });
             }
             
-            // 第1层：根节点和配偶
+            // 第1层：根节点和配偶（始终显示）
             const rootMembers = [{
                 individual: rootData.individual,
                 isSpouse: false,
@@ -1334,15 +1334,18 @@
             }
             levels.push({ members: rootMembers, generation: 0 });
             
-            // 后续层级：按代数收集所有后代
-            await collectDescendantsByGeneration(rootData, levels, 1);
+            // 后续层级：按代数收集所有后代（只有在代数设置允许时才收集）
+            if (currentGenerations > 1) {
+                await collectDescendantsByGeneration(rootData, levels, 1);
+            }
             
             return { levels, rootLevel };
         }
 
         // 按代数收集后代
         async function collectDescendantsByGeneration(parentData, levels, generation) {
-            if (!parentData.children || parentData.children.length === 0) {
+            // 检查是否超过了设定的代数限制
+            if (!parentData.children || parentData.children.length === 0 || generation >= currentGenerations) {
                 return;
             }
             
@@ -1378,8 +1381,8 @@
                     console.error('获取配偶信息失败:', error);
                 }
                 
-                // 收集下一代数据
-                if (child.children && child.children.length > 0) {
+                // 收集下一代数据（只有在未达到代数限制时才收集）
+                if (child.children && child.children.length > 0 && generation + 1 < currentGenerations) {
                     nextGenData.push(child);
                 }
             }
@@ -1389,8 +1392,8 @@
                 levels.push({ members: currentGenMembers, generation });
             }
             
-            // 递归处理下一代
-            if (nextGenData.length > 0) {
+            // 递归处理下一代（只有在未达到代数限制时才递归）
+            if (nextGenData.length > 0 && generation + 1 < currentGenerations) {
                 const combinedNextGen = {
                     children: nextGenData.flatMap(parent => parent.children)
                 };
