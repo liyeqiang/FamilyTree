@@ -226,7 +226,7 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 	}
 	if req.PhotoURL == nil {
 		photoURL := current.PhotoURL
-		req.PhotoURL = &photoURL
+		req.PhotoURL = photoURL
 	}
 
 	// 更新个人信息（使用指针字段的值或保持原值）
@@ -242,7 +242,7 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 		DeathPlaceID: req.DeathPlaceID,
 		Occupation:   getStringValue(req.Occupation, current.Occupation),
 		Notes:        getStringValue(req.Notes, current.Notes),
-		PhotoURL:     getStringValue(req.PhotoURL, current.PhotoURL),
+		PhotoURL:     req.PhotoURL,
 		FatherID:     req.FatherID,
 		MotherID:     req.MotherID,
 	}
@@ -254,6 +254,14 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 func getStringValue(ptr *string, defaultValue string) string {
 	if ptr != nil {
 		return *ptr
+	}
+	return defaultValue
+}
+
+// 辅助函数：获取字符串指针的值或默认值（用于 *string 类型）
+func getStringPointerValue(ptr *string, defaultValue *string) *string {
+	if ptr != nil {
+		return ptr
 	}
 	return defaultValue
 }
