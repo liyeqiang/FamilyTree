@@ -72,6 +72,7 @@ type Individual struct {
 	Father        *Individual  `json:"father,omitempty" db:"-"`
 	Mother        *Individual  `json:"mother,omitempty" db:"-"`
 	Children      []Individual `json:"children,omitempty" db:"-"`
+	MarriageOrder int          `json:"marriage_order,omitempty" db:"-"` // 婚姻顺序（临时字段）
 }
 
 // Family 家庭关系结构体

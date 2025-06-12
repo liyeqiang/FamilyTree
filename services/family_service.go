@@ -11,14 +11,14 @@ import (
 
 // FamilyService 家庭关系服务实现
 type FamilyService struct {
-	repo interfaces.FamilyRepository
+	repo           interfaces.FamilyRepository
 	individualRepo interfaces.IndividualRepository
 }
 
 // NewFamilyService 创建新的家庭关系服务
 func NewFamilyService(repo interfaces.FamilyRepository, individualRepo interfaces.IndividualRepository) interfaces.FamilyService {
 	return &FamilyService{
-		repo: repo,
+		repo:           repo,
 		individualRepo: individualRepo,
 	}
 }
@@ -57,17 +57,35 @@ func (s *FamilyService) CreateFamily(ctx context.Context, req *models.CreateFami
 		}
 	}
 
+	// 计算婚姻顺序
+	var marriageOrder int = 1
+	if req.HusbandID != nil {
+		// 获取丈夫的现有家庭关系，计算婚姻顺序
+		existingFamilies, err := s.repo.GetFamiliesByIndividualID(ctx, *req.HusbandID)
+		if err != nil {
+			return nil, fmt.Errorf("获取现有家庭关系失败: %v", err)
+		}
+
+		for _, family := range existingFamilies {
+			if family.HusbandID != nil && *family.HusbandID == *req.HusbandID {
+				if family.MarriageOrder >= marriageOrder {
+					marriageOrder = family.MarriageOrder + 1
+				}
+			}
+		}
+	}
+
 	// 创建家庭记录
 	family := &models.Family{
-		HusbandID:        req.HusbandID,
-		WifeID:           req.WifeID,
-		MarriageOrder:    1, // 默认为第一任
-		MarriageDate:     req.MarriageDate,
-		MarriagePlaceID:  req.MarriagePlaceID,
-		DivorceDate:      req.DivorceDate,
-		Notes:            req.Notes,
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
+		HusbandID:       req.HusbandID,
+		WifeID:          req.WifeID,
+		MarriageOrder:   marriageOrder, // 使用计算出的婚姻顺序
+		MarriageDate:    req.MarriageDate,
+		MarriagePlaceID: req.MarriagePlaceID,
+		DivorceDate:     req.DivorceDate,
+		Notes:           req.Notes,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
 	}
 
 	return s.repo.CreateFamily(ctx, family)
@@ -105,15 +123,16 @@ func (s *FamilyService) Update(ctx context.Context, id int, req *models.CreateFa
 
 	// 更新家庭记录
 	family := &models.Family{
-		FamilyID:         id,
-		HusbandID:        req.HusbandID,
-		WifeID:           req.WifeID,
-		MarriageDate:     req.MarriageDate,
-		MarriagePlaceID:  req.MarriagePlaceID,
-		DivorceDate:      req.DivorceDate,
-		Notes:            req.Notes,
-		CreatedAt:        current.CreatedAt,
-		UpdatedAt:        time.Now(),
+		FamilyID:        id,
+		HusbandID:       req.HusbandID,
+		WifeID:          req.WifeID,
+		MarriageOrder:   current.MarriageOrder, // 保持原有的婚姻顺序
+		MarriageDate:    req.MarriageDate,
+		MarriagePlaceID: req.MarriagePlaceID,
+		DivorceDate:     req.DivorceDate,
+		Notes:           req.Notes,
+		CreatedAt:       current.CreatedAt,
+		UpdatedAt:       time.Now(),
 	}
 
 	return s.repo.UpdateFamily(ctx, id, family)
@@ -145,10 +164,10 @@ func (s *FamilyService) GetBySpouses(ctx context.Context, husbandID, wifeID int)
 	}
 
 	for _, family := range families {
-		if (family.HusbandID != nil && *family.HusbandID == husbandID && 
+		if (family.HusbandID != nil && *family.HusbandID == husbandID &&
 			family.WifeID != nil && *family.WifeID == wifeID) ||
-		   (family.HusbandID != nil && *family.HusbandID == wifeID && 
-			family.WifeID != nil && *family.WifeID == husbandID) {
+			(family.HusbandID != nil && *family.HusbandID == wifeID &&
+				family.WifeID != nil && *family.WifeID == husbandID) {
 			return &family, nil
 		}
 	}
@@ -193,7 +212,7 @@ func (s *FamilyService) AddSpouse(ctx context.Context, individualID, spouseID in
 
 	for _, family := range existingFamilies {
 		if (family.HusbandID != nil && *family.HusbandID == spouseID) ||
-		   (family.WifeID != nil && *family.WifeID == spouseID) {
+			(family.WifeID != nil && *family.WifeID == spouseID) {
 			return nil, fmt.Errorf("已存在相同的配偶关系")
 		}
 	}
@@ -201,7 +220,7 @@ func (s *FamilyService) AddSpouse(ctx context.Context, individualID, spouseID in
 	// 根据性别确定夫妻角色并计算婚姻顺序
 	var req *models.CreateFamilyRequest
 	var marriageOrder int = 1
-	
+
 	if individual.Gender == models.GenderMale && spouse.Gender == models.GenderFemale {
 		// 男性添加妻子 - 计算他的妻子数量
 		for _, family := range existingFamilies {
@@ -238,15 +257,15 @@ func (s *FamilyService) AddSpouse(ctx context.Context, individualID, spouseID in
 
 	// 创建家庭关系，包含婚姻顺序
 	family := &models.Family{
-		HusbandID:        req.HusbandID,
-		WifeID:           req.WifeID,
-		MarriageOrder:    marriageOrder,
-		MarriageDate:     req.MarriageDate,
-		MarriagePlaceID:  req.MarriagePlaceID,
-		DivorceDate:      req.DivorceDate,
-		Notes:            req.Notes,
-		CreatedAt:        time.Now(),
-		UpdatedAt:        time.Now(),
+		HusbandID:       req.HusbandID,
+		WifeID:          req.WifeID,
+		MarriageOrder:   marriageOrder,
+		MarriageDate:    req.MarriageDate,
+		MarriagePlaceID: req.MarriagePlaceID,
+		DivorceDate:     req.DivorceDate,
+		Notes:           req.Notes,
+		CreatedAt:       time.Now(),
+		UpdatedAt:       time.Now(),
 	}
 
 	return s.repo.CreateFamily(ctx, family)
@@ -297,4 +316,4 @@ func (s *FamilyService) GetChildren(ctx context.Context, familyID int) ([]models
 		return nil, fmt.Errorf("无效的家庭ID")
 	}
 	return s.repo.GetChildrenByFamilyID(ctx, familyID)
-} 
+}

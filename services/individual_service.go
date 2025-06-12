@@ -3,52 +3,80 @@ package services
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"familytree/interfaces"
 	"familytree/models"
 )
 
-// IndividualService 个人服务实现
+// IndividualService 个人信息服务
 type IndividualService struct {
-	repo interfaces.IndividualRepository
+	repo       interfaces.IndividualRepository
+	familyRepo interfaces.FamilyRepository
 }
 
-// NewIndividualService 创建新的个人服务
-func NewIndividualService(repo interfaces.IndividualRepository) interfaces.IndividualService {
-	return &IndividualService{repo: repo}
+// NewIndividualService 创建个人信息服务
+func NewIndividualService(repo interfaces.IndividualRepository, familyRepo interfaces.FamilyRepository) interfaces.IndividualService {
+	return &IndividualService{
+		repo:       repo,
+		familyRepo: familyRepo,
+	}
 }
 
 // Create 创建个人信息
 func (s *IndividualService) Create(ctx context.Context, req *models.CreateIndividualRequest) (*models.Individual, error) {
-	// 验证输入
+	// 验证必填字段
 	if req.FullName == "" {
 		return nil, fmt.Errorf("姓名不能为空")
 	}
 
-	// 验证父母关系
-	if req.FatherID != nil && req.MotherID != nil && *req.FatherID == *req.MotherID {
-		return nil, fmt.Errorf("父亲和母亲不能是同一个人")
-	}
-
-	// 验证父亲性别
+	// 如果指定了父亲，验证父亲存在且为男性
 	if req.FatherID != nil {
 		father, err := s.repo.GetIndividualByID(ctx, *req.FatherID)
 		if err != nil {
-			return nil, fmt.Errorf("父亲信息不存在")
+			return nil, fmt.Errorf("父亲不存在")
 		}
 		if father.Gender != models.GenderMale {
-			return nil, fmt.Errorf("父亲必须是男性")
+			return nil, fmt.Errorf("指定的父亲必须是男性")
 		}
-	}
 
-	// 验证母亲性别
-	if req.MotherID != nil {
+		// 如果指定了母亲，验证母亲存在且为女性
+		if req.MotherID != nil {
+			mother, err := s.repo.GetIndividualByID(ctx, *req.MotherID)
+			if err != nil {
+				return nil, fmt.Errorf("母亲不存在")
+			}
+			if mother.Gender != models.GenderFemale {
+				return nil, fmt.Errorf("指定的母亲必须是女性")
+			}
+
+			// 验证父母是否已婚
+			families, err := s.familyRepo.GetFamiliesByIndividualID(ctx, *req.FatherID)
+			if err != nil {
+				return nil, fmt.Errorf("验证父母婚姻关系失败: %v", err)
+			}
+
+			married := false
+			for _, family := range families {
+				if family.HusbandID != nil && *family.HusbandID == *req.FatherID &&
+					family.WifeID != nil && *family.WifeID == *req.MotherID {
+					married = true
+					break
+				}
+			}
+
+			if !married {
+				return nil, fmt.Errorf("指定的父母未建立婚姻关系")
+			}
+		}
+	} else if req.MotherID != nil {
+		// 如果只指定了母亲，验证母亲存在且为女性
 		mother, err := s.repo.GetIndividualByID(ctx, *req.MotherID)
 		if err != nil {
-			return nil, fmt.Errorf("母亲信息不存在")
+			return nil, fmt.Errorf("母亲不存在")
 		}
 		if mother.Gender != models.GenderFemale {
-			return nil, fmt.Errorf("母亲必须是女性")
+			return nil, fmt.Errorf("指定的母亲必须是女性")
 		}
 	}
 
@@ -57,14 +85,19 @@ func (s *IndividualService) Create(ctx context.Context, req *models.CreateIndivi
 		FullName:     req.FullName,
 		Gender:       req.Gender,
 		BirthDate:    req.BirthDate,
+		BirthPlace:   req.BirthPlace,
 		BirthPlaceID: req.BirthPlaceID,
 		DeathDate:    req.DeathDate,
+		DeathPlace:   req.DeathPlace,
+		BurialPlace:  req.BurialPlace,
 		DeathPlaceID: req.DeathPlaceID,
 		Occupation:   req.Occupation,
 		Notes:        req.Notes,
 		PhotoURL:     req.PhotoURL,
 		FatherID:     req.FatherID,
 		MotherID:     req.MotherID,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
 	}
 
 	return s.repo.CreateIndividual(ctx, individual)

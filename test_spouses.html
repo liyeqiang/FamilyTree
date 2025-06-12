@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试配偶查询</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .form-group { margin: 10px 0; }
+        label { display: inline-block; width: 100px; }
+        input, select { width: 200px; padding: 5px; }
+        button { padding: 10px 20px; margin: 10px 5px; }
+        #result { margin-top: 20px; padding: 10px; border: 1px solid #ccc; }
+        .spouse-item { margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>测试配偶查询功能</h1>
+    
+    <div class="form-group">
+        <label>个人ID:</label>
+        <input type="number" id="individualId" value="12" placeholder="输入个人ID">
+    </div>
+    
+    <button onclick="getSpouses()">查询配偶</button>
+    <button onclick="getFamilies()">查询家庭关系</button>
+    <button onclick="getAllIndividuals()">查询所有个人</button>
+    
+    <div id="result"></div>
+
+    <script>
+        async function getSpouses() {
+            const id = document.getElementById('individualId').value;
+            if (!id) {
+                alert('请输入个人ID');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/individuals/${id}/spouses`);
+                const data = await response.json();
+                
+                let html = '<h3>配偶查询结果:</h3>';
+                if (data.success && data.data) {
+                    if (data.data.length === 0) {
+                        html += '<p>没有找到配偶</p>';
+                    } else {
+                        data.data.forEach(spouse => {
+                            html += `
+                                <div class="spouse-item">
+                                    <strong>姓名:</strong> ${spouse.full_name}<br>
+                                    <strong>性别:</strong> ${spouse.gender === 'male' ? '男' : '女'}<br>
+                                    <strong>ID:</strong> ${spouse.individual_id}<br>
+                                    <strong>婚姻顺序:</strong> ${spouse.marriage_order || '未设置'}<br>
+                                    <strong>出生日期:</strong> ${spouse.birth_date || '未知'}
+                                </div>
+                            `;
+                        });
+                    }
+                } else {
+                    html += `<p style="color: red;">查询失败: ${data.message || '未知错误'}</p>`;
+                }
+                
+                document.getElementById('result').innerHTML = html;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<p style="color: red;">网络错误: ${error.message}</p>`;
+            }
+        }
+        
+        async function getFamilies() {
+            const id = document.getElementById('individualId').value;
+            if (!id) {
+                alert('请输入个人ID');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/families/husband/${id}`);
+                const data = await response.json();
+                
+                let html = '<h3>家庭关系查询结果:</h3>';
+                if (data.success && data.data) {
+                    if (data.data.length === 0) {
+                        html += '<p>没有找到家庭关系</p>';
+                    } else {
+                        data.data.forEach(family => {
+                            html += `
+                                <div class="spouse-item">
+                                    <strong>家庭ID:</strong> ${family.family_id}<br>
+                                    <strong>丈夫ID:</strong> ${family.husband_id || '未设置'}<br>
+                                    <strong>妻子ID:</strong> ${family.wife_id || '未设置'}<br>
+                                    <strong>婚姻顺序:</strong> ${family.marriage_order || '未设置'}<br>
+                                    <strong>结婚日期:</strong> ${family.marriage_date || '未知'}
+                                </div>
+                            `;
+                        });
+                    }
+                } else {
+                    html += `<p style="color: red;">查询失败: ${data.message || '未知错误'}</p>`;
+                }
+                
+                document.getElementById('result').innerHTML = html;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<p style="color: red;">网络错误: ${error.message}</p>`;
+            }
+        }
+        
+        async function getAllIndividuals() {
+            try {
+                const response = await fetch('/api/v1/individuals');
+                const data = await response.json();
+                
+                let html = '<h3>所有个人信息:</h3>';
+                if (data.success && data.data) {
+                    data.data.forEach(person => {
+                        html += `
+                            <div class="spouse-item">
+                                <strong>ID:</strong> ${person.individual_id} - 
+                                <strong>姓名:</strong> ${person.full_name} - 
+                                <strong>性别:</strong> ${person.gender === 'male' ? '男' : '女'}
+                            </div>
+                        `;
+                    });
+                } else {
+                    html += `<p style="color: red;">查询失败: ${data.message || '未知错误'}</p>`;
+                }
+                
+                document.getElementById('result').innerHTML = html;
+            } catch (error) {
+                document.getElementById('result').innerHTML = `<p style="color: red;">网络错误: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html> 

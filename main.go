@@ -26,24 +26,24 @@ import (
 
 // DemoRepository 内存存储库用于演示模式
 type DemoRepository struct {
-	individuals []models.Individual
-	families    []models.Family
-	children    []models.Child
-	nextID      int
+	individuals  []models.Individual
+	families     []models.Family
+	children     []models.Child
+	nextID       int
 	nextFamilyID int
 	nextChildID  int
 }
 
 func NewDemoRepository() *DemoRepository {
 	repo := &DemoRepository{
-		individuals: make([]models.Individual, 0),
-		families:    make([]models.Family, 0),
-		children:    make([]models.Child, 0),
-		nextID:      1,
+		individuals:  make([]models.Individual, 0),
+		families:     make([]models.Family, 0),
+		children:     make([]models.Child, 0),
+		nextID:       1,
 		nextFamilyID: 1,
 		nextChildID:  1,
 	}
-	
+
 	// 添加示例数据 - 6代完整家族
 	now := time.Now()
 	birthDate1920 := time.Date(1920, 1, 15, 0, 0, 0, 0, time.UTC)
@@ -62,31 +62,31 @@ func NewDemoRepository() *DemoRepository {
 	birthDate1980 := time.Date(1980, 4, 25, 0, 0, 0, 0, time.UTC)
 	birthDate1995 := time.Date(1995, 7, 12, 0, 0, 0, 0, time.UTC)
 	birthDate1998 := time.Date(1998, 9, 8, 0, 0, 0, 0, time.UTC)
-	
+
 	individuals := []models.Individual{
 		// 第1代（祖父母）
 		{IndividualID: 1, FullName: "张老爷子", Gender: models.GenderMale, BirthDate: &birthDate1920, BirthPlace: "山东省济南市", Occupation: "农民", Notes: "家族始祖", CreatedAt: now, UpdatedAt: now},
 		{IndividualID: 2, FullName: "李老太太", Gender: models.GenderFemale, BirthDate: &birthDate1925, BirthPlace: "河北省石家庄市", Occupation: "家庭主妇", Notes: "张老爷子的妻子", CreatedAt: now, UpdatedAt: now},
-		
+
 		// 第2代（父母）
 		{IndividualID: 3, FullName: "张伟", Gender: models.GenderMale, BirthDate: &birthDate1950, BirthPlace: "北京市朝阳区", Occupation: "工程师", Notes: "张老爷子和李老太太的儿子", FatherID: &[]int{1}[0], MotherID: &[]int{2}[0], CreatedAt: now, UpdatedAt: now},
 		{IndividualID: 4, FullName: "王丽", Gender: models.GenderFemale, BirthDate: &birthDate1955, BirthPlace: "上海市黄浦区", Occupation: "教师", Notes: "张伟的妻子", CreatedAt: now, UpdatedAt: now},
-		
+
 		// 第3代（本人一代）
 		{IndividualID: 5, FullName: "张明", Gender: models.GenderMale, BirthDate: &birthDate1975, BirthPlace: "北京市海淀区", Occupation: "医生", Notes: "张伟和王丽的儿子", FatherID: &[]int{3}[0], MotherID: &[]int{4}[0], CreatedAt: now, UpdatedAt: now},
 		{IndividualID: 6, FullName: "李美", Gender: models.GenderFemale, BirthDate: &birthDate1978, BirthPlace: "天津市和平区", Occupation: "护士", Notes: "张明的妻子", CreatedAt: now, UpdatedAt: now},
-		
+
 		// 第4代（子女）
 		{IndividualID: 7, FullName: "张小宝", Gender: models.GenderMale, BirthDate: &birthDate2005, BirthPlace: "北京市西城区", Occupation: "学生", Notes: "张明和李美的儿子", FatherID: &[]int{5}[0], MotherID: &[]int{6}[0], CreatedAt: now, UpdatedAt: now},
 		{IndividualID: 8, FullName: "赵小花", Gender: models.GenderFemale, BirthDate: &birthDate2008, BirthPlace: "广州市天河区", Occupation: "学生", Notes: "张小宝的女友", CreatedAt: now, UpdatedAt: now},
-		
+
 		// 第5代（孙子女）
 		{IndividualID: 9, FullName: "张小小", Gender: models.GenderMale, BirthDate: &birthDate2030, BirthPlace: "深圳市南山区", Occupation: "程序员", Notes: "张小宝和赵小花的儿子", FatherID: &[]int{7}[0], MotherID: &[]int{8}[0], CreatedAt: now, UpdatedAt: now},
 		{IndividualID: 10, FullName: "陈小雅", Gender: models.GenderFemale, BirthDate: &birthDate2032, BirthPlace: "杭州市西湖区", Occupation: "设计师", Notes: "张小小的妻子", CreatedAt: now, UpdatedAt: now},
-		
+
 		// 第6代（曾孙）
 		{IndividualID: 11, FullName: "张宝宝", Gender: models.GenderMale, BirthDate: &birthDate2055, BirthPlace: "上海市浦东新区", Occupation: "", Notes: "张小小和陈小雅的儿子", FatherID: &[]int{9}[0], MotherID: &[]int{10}[0], CreatedAt: now, UpdatedAt: now},
-		
+
 		// 添加一夫多妻的演示数据
 		{IndividualID: 12, FullName: "李富贵", Gender: models.GenderMale, BirthDate: &birthDate1970, BirthPlace: "上海", Occupation: "商人", Notes: "有两个妻子的富商", CreatedAt: now, UpdatedAt: now},
 		{IndividualID: 13, FullName: "王美丽", Gender: models.GenderFemale, BirthDate: &birthDate1975, BirthPlace: "上海", Occupation: "家庭主妇", Notes: "李富贵的第一任妻子", CreatedAt: now, UpdatedAt: now},
@@ -95,10 +95,10 @@ func NewDemoRepository() *DemoRepository {
 		{IndividualID: 16, FullName: "李二宝", Gender: models.GenderFemale, BirthDate: &birthDate1998, BirthPlace: "上海", Notes: "李富贵和王美丽的女儿", FatherID: &[]int{12}[0], MotherID: &[]int{13}[0], CreatedAt: now, UpdatedAt: now},
 		{IndividualID: 17, FullName: "李小花", Gender: models.GenderFemale, BirthDate: &birthDate2005, BirthPlace: "上海", Notes: "李富贵和赵小花的女儿", FatherID: &[]int{12}[0], MotherID: &[]int{14}[0], CreatedAt: now, UpdatedAt: now},
 	}
-	
+
 	repo.individuals = individuals
 	repo.nextID = 18
-	
+
 	// 添加示例家庭数据 - 6代家族的配偶关系
 	families := []models.Family{
 		{FamilyID: 1, HusbandID: &[]int{1}[0], WifeID: &[]int{2}[0], MarriageOrder: 1, Notes: "张老爷子和李老太太的家庭", CreatedAt: now, UpdatedAt: now},
@@ -112,7 +112,7 @@ func NewDemoRepository() *DemoRepository {
 	}
 	repo.families = families
 	repo.nextFamilyID = 8
-	
+
 	// 添加示例子女关系数据 - 6代家族的父子关系
 	childrenData := []models.Child{
 		{ChildID: 1, FamilyID: 1, IndividualID: 3, RelationshipToParents: "生子", CreatedAt: now, UpdatedAt: now},
@@ -127,7 +127,7 @@ func NewDemoRepository() *DemoRepository {
 	}
 	repo.children = childrenData
 	repo.nextChildID = 9
-	
+
 	return repo
 }
 
@@ -137,7 +137,7 @@ func (r *DemoRepository) CreateIndividual(ctx context.Context, individual *model
 	individual.CreatedAt = time.Now()
 	individual.UpdatedAt = time.Now()
 	r.nextID++
-	
+
 	r.individuals = append(r.individuals, *individual)
 	return individual, nil
 }
@@ -181,20 +181,20 @@ func (r *DemoRepository) SearchIndividuals(ctx context.Context, query string, li
 			results = append(results, individual)
 		}
 	}
-	
+
 	total := len(results)
-	
+
 	// 分页
 	start := offset
 	if start > len(results) {
 		start = len(results)
 	}
-	
+
 	end := start + limit
 	if end > len(results) {
 		end = len(results)
 	}
-	
+
 	return results[start:end], total, nil
 }
 
@@ -202,7 +202,7 @@ func (r *DemoRepository) GetIndividualsByParentID(ctx context.Context, parentID 
 	var children []models.Individual
 	for _, individual := range r.individuals {
 		if (individual.FatherID != nil && *individual.FatherID == parentID) ||
-		   (individual.MotherID != nil && *individual.MotherID == parentID) {
+			(individual.MotherID != nil && *individual.MotherID == parentID) {
 			children = append(children, individual)
 		}
 	}
@@ -224,7 +224,7 @@ func (r *DemoRepository) GetIndividualsByIDs(ctx context.Context, ids []int) ([]
 
 func (r *DemoRepository) GetSpouses(ctx context.Context, individualID int) ([]models.Individual, error) {
 	var spouses []models.Individual
-	
+
 	// 根据families数据查找配偶
 	for _, family := range r.families {
 		var spouseID *int
@@ -233,15 +233,17 @@ func (r *DemoRepository) GetSpouses(ctx context.Context, individualID int) ([]mo
 		} else if family.WifeID != nil && *family.WifeID == individualID && family.HusbandID != nil {
 			spouseID = family.HusbandID
 		}
-		
+
 		if spouseID != nil {
 			spouse, err := r.GetIndividualByID(ctx, *spouseID)
 			if err == nil {
+				// 设置 MarriageOrder 信息
+				spouse.MarriageOrder = family.MarriageOrder
 				spouses = append(spouses, *spouse)
 			}
 		}
 	}
-	
+
 	return spouses, nil
 }
 
@@ -251,7 +253,7 @@ func (r *DemoRepository) CreateFamily(ctx context.Context, family *models.Family
 	family.CreatedAt = time.Now()
 	family.UpdatedAt = time.Now()
 	r.nextFamilyID++
-	
+
 	r.families = append(r.families, *family)
 	return family, nil
 }
@@ -292,7 +294,7 @@ func (r *DemoRepository) GetFamiliesByIndividualID(ctx context.Context, individu
 	var families []models.Family
 	for _, family := range r.families {
 		if (family.HusbandID != nil && *family.HusbandID == individualID) ||
-		   (family.WifeID != nil && *family.WifeID == individualID) {
+			(family.WifeID != nil && *family.WifeID == individualID) {
 			families = append(families, family)
 		}
 	}
@@ -304,7 +306,7 @@ func (r *DemoRepository) CreateChild(ctx context.Context, child *models.Child) (
 	child.CreatedAt = time.Now()
 	child.UpdatedAt = time.Now()
 	r.nextChildID++
-	
+
 	r.children = append(r.children, *child)
 	return child, nil
 }
@@ -353,9 +355,11 @@ func main() {
 func runDemoMode() {
 	fmt.Println("🚀 启动家谱系统（内存演示版）...")
 
-	// 创建演示存储库和服务
+	// 创建演示存储库
 	repo := NewDemoRepository()
-	individualService := services.NewIndividualService(repo)
+
+	// 创建服务
+	individualService := services.NewIndividualService(repo, repo)
 	familyService := services.NewFamilyService(repo, repo)
 
 	// 创建处理器
@@ -375,7 +379,7 @@ func runSQLiteMode() {
 
 	// 加载配置
 	cfg := config.LoadConfig()
-	
+
 	// 连接数据库
 	db, err := cfg.Connect()
 	if err != nil {
@@ -390,16 +394,15 @@ func runSQLiteMode() {
 	}
 
 	// 创建存储库
-	sqliteRepo := repository.NewSQLiteRepository(db)
-
-	// 创建服务
-	individualService := services.NewIndividualService(sqliteRepo)
+	individualRepo := repository.NewSQLiteRepository(db)
+	familyRepo := repository.NewSQLiteRepository(db)
+	individualService := services.NewIndividualService(individualRepo, familyRepo)
+	familyService := services.NewFamilyService(familyRepo, individualRepo)
 
 	// 创建处理器
 	individualHandler := handlers.NewIndividualHandler(individualService)
 
 	// 创建家庭服务
-	familyService := services.NewFamilyService(sqliteRepo, sqliteRepo)
 	familyHandler := handlers.NewFamilyHandler(familyService)
 
 	// 创建并配置路由器
@@ -432,10 +435,10 @@ func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *h
 	individuals.HandleFunc("/{id:[0-9]+}/ancestors", individualHandler.GetAncestors).Methods("GET")
 	individuals.HandleFunc("/{id:[0-9]+}/descendants", individualHandler.GetDescendants).Methods("GET")
 	individuals.HandleFunc("/{id:[0-9]+}/family-tree", individualHandler.GetFamilyTree).Methods("GET")
-	
+
 	// 配偶关系路由
 	individuals.HandleFunc("/{id:[0-9]+}/add-spouse", familyHandler.AddSpouse).Methods("POST")
-	
+
 	// 家庭关系路由
 	families := router.PathPrefix("/api/v1/families").Subrouter()
 	families.HandleFunc("/husband/{id:[0-9]+}", familyHandler.GetFamiliesByHusband).Methods("GET")
@@ -445,8 +448,8 @@ func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *h
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		response := map[string]string{
-			"status":  "ok",
-			"mode":    mode,
+			"status": "ok",
+			"mode":   mode,
 		}
 		if mode == "sqlite" {
 			response["message"] = "家谱系统SQLite版运行中"
@@ -465,6 +468,11 @@ func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *h
 		http.ServeFile(w, r, "test_add_child.html")
 	}).Methods("GET")
 
+	// 测试配偶页面
+	router.HandleFunc("/test_spouses.html", func(w http.ResponseWriter, r *http.Request) {
+		http.ServeFile(w, r, "test_spouses.html")
+	}).Methods("GET")
+
 	// UI管理界面
 	router.HandleFunc("/ui", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/static/index.html", http.StatusFound)
@@ -478,7 +486,7 @@ func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *h
 	// API文档页面
 	router.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		
+
 		var pageTitle, modeInfo, modeDescription string
 		if mode == "sqlite" {
 			pageTitle = "家谱系统 - SQLite版"
@@ -658,15 +666,15 @@ func loggingMiddleware(next http.Handler) http.Handler {
 
 // contains 检查字符串是否包含子字符串
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) && 
-		   (len(substr) == 0 || func() bool {
-			   for i := 0; i <= len(s)-len(substr); i++ {
-				   if s[i:i+len(substr)] == substr {
-					   return true
-				   }
-			   }
-			   return false
-		   }())
+	return len(s) >= len(substr) &&
+		(len(substr) == 0 || func() bool {
+			for i := 0; i <= len(s)-len(substr); i++ {
+				if s[i:i+len(substr)] == substr {
+					return true
+				}
+			}
+			return false
+		}())
 }
 
 // initializeDatabase 初始化数据库（创建表和示例数据）
@@ -691,7 +699,7 @@ func initializeDatabase(db *sql.DB) error {
 
 	// 使用更智能的分割方法
 	statements := splitSQLStatements(cleanSQL)
-	
+
 	for i, stmt := range statements {
 		stmt = strings.TrimSpace(stmt)
 		if stmt == "" {
@@ -716,13 +724,13 @@ func splitSQLStatements(sql string) []string {
 	inString := false
 	var stringChar byte
 	beginEndLevel := 0
-	
+
 	// 将SQL转换为upper case来检测关键字
 	upperSQL := strings.ToUpper(sql)
-	
+
 	for i := 0; i < len(sql); i++ {
 		char := sql[i]
-		
+
 		// 处理字符串
 		if (char == '\'' || char == '"') && (i == 0 || sql[i-1] != '\\') {
 			if !inString {
@@ -732,21 +740,21 @@ func splitSQLStatements(sql string) []string {
 				inString = false
 			}
 		}
-		
+
 		// 检测BEGIN关键字
 		if !inString && i <= len(upperSQL)-5 {
 			if upperSQL[i:i+5] == "BEGIN" && (i == 0 || !isAlphaNumeric(upperSQL[i-1])) && (i+5 >= len(upperSQL) || !isAlphaNumeric(upperSQL[i+5])) {
 				beginEndLevel++
 			}
 		}
-		
+
 		// 检测END关键字
 		if !inString && i <= len(upperSQL)-3 {
 			if upperSQL[i:i+3] == "END" && (i == 0 || !isAlphaNumeric(upperSQL[i-1])) && (i+3 >= len(upperSQL) || !isAlphaNumeric(upperSQL[i+3])) {
 				beginEndLevel--
 			}
 		}
-		
+
 		// 如果遇到分号且不在字符串中且不在BEGIN...END块中
 		if char == ';' && !inString && beginEndLevel == 0 {
 			stmt := strings.TrimSpace(current.String())
@@ -756,16 +764,16 @@ func splitSQLStatements(sql string) []string {
 			current.Reset()
 			continue
 		}
-		
+
 		current.WriteByte(char)
 	}
-	
+
 	// 添加最后一个语句
 	stmt := strings.TrimSpace(current.String())
 	if stmt != "" {
 		statements = append(statements, stmt)
 	}
-	
+
 	return statements
 }
 
@@ -780,4 +788,4 @@ func truncateString(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
-} 
+}
