@@ -1720,6 +1720,7 @@
             
             // 获取每个父节点的子节点
             console.log('=== 开始构建父子关系映射 ===');
+            
             parentNodes.forEach(parentNode => {
                 const parentId = parseInt(parentNode.dataset.id);
                 const parentName = parentNode.querySelector('.node-name').textContent;
