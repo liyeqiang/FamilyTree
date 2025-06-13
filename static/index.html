@@ -519,7 +519,7 @@
                 max-width: 110px;
                 padding: 8px;
             }
-
+            
             .marriage-connector {
                 font-size: 1.2em;
                 margin: 0 5px;
@@ -537,7 +537,7 @@
                 padding: 10px;
                 font-size: 0.9em;
             }
-
+            
             .tree-node.compact {
                 min-width: 80px;
                 max-width: 100px;
@@ -1255,8 +1255,8 @@
                     }
                     return; // 阻止后续处理
                 }
-                
-                // 点击空白处关闭搜索结果和右键菜单
+            
+            // 点击空白处关闭搜索结果和右键菜单
                 if (!e.target.closest('.search-container')) {
                     document.getElementById('searchResults').style.display = 'none';
                 }
@@ -1445,7 +1445,7 @@
         // 渲染家族树
         async function displayFamilyTree(treeData) {
             const container = document.getElementById('treeContainer');
-            container.innerHTML = await renderFamilyTree(treeData);
+                container.innerHTML = await renderFamilyTree(treeData);
         }
 
         // 渲染家族树
@@ -1469,15 +1469,18 @@
                 
                 html += `<div class="tree-generation" data-level="${level}">`;
                 
-                for (const member of levelData.members) {
-                    if (member.isSpouse) {
-                        html += '<div class="marriage-connector">💕</div>';
-                    }
-                    
+                for (let i = 0; i < levelData.members.length; i++) {
+                    const member = levelData.members[i];
                     const nodeClass = getNodeClass(member, level, treeStructure.rootLevel);
                     const label = getNodeLabel(member, level, treeStructure.rootLevel);
                     
                     html += renderTreeNode(member.individual, nodeClass, label, shouldUseCompact);
+                    
+                    // 如果下一个成员是配偶，在当前节点后面添加连接器
+                    const nextMember = levelData.members[i + 1];
+                    if (nextMember && nextMember.isSpouse) {
+                        html += '<div class="marriage-connector">💕</div>';
+                    }
                 }
                 
                 html += '</div>';
@@ -1504,12 +1507,20 @@
             // 第0层：父母（只有在代数设置允许时才显示）
             if (rootData.parents && rootData.parents.length > 0 && currentGenerations > 1) {
                 const parentMembers = [];
+                const processedParents = new Set();
+                
                 for (const parent of rootData.parents) {
+                    if (processedParents.has(parent.individual_id)) {
+                        continue; // 跳过已处理的父母
+                    }
+                    
+                    // 添加第一个父母（通常是父亲）
                     parentMembers.push({
                         individual: parent,
                         isSpouse: false,
                         generation: -1
                     });
+                    processedParents.add(parent.individual_id);
                     
                     // 获取父母的配偶
                     try {
@@ -1520,12 +1531,13 @@
                         
                         if (spousesData.success && spousesData.data && spousesData.data.length > 0) {
                             spousesData.data.forEach(spouse => {
-                                if (!rootData.parents.some(p => p.individual_id === spouse.individual_id)) {
+                                if (!processedParents.has(spouse.individual_id)) {
                                     parentMembers.push({
                                         individual: spouse,
                                         isSpouse: true,
                                         generation: -1
                                     });
+                                    processedParents.add(spouse.individual_id);
                                 }
                             });
                         }
@@ -1984,16 +1996,33 @@
 
         // 绘制配偶连接线
         function drawSpouseConnections(svg, levelElement, container) {
+            console.log('=== 绘制配偶连接线 ===');
             const nodes = levelElement.querySelectorAll('.tree-node');
             const containerRect = container.getBoundingClientRect();
+            
+            console.log('层级元素:', levelElement);
+            console.log('节点数量:', nodes.length);
+            console.log('节点列表:', Array.from(nodes).map(n => ({
+                name: n.querySelector('.node-name')?.textContent,
+                id: n.dataset.id,
+                class: n.className
+            })));
             
             for (let i = 0; i < nodes.length - 1; i++) {
                 const node1 = nodes[i];
                 const node2 = nodes[i + 1];
                 
+                console.log(`检查节点对 ${i} -> ${i+1}:`);
+                console.log('节点1:', node1.querySelector('.node-name')?.textContent);
+                console.log('节点2:', node2.querySelector('.node-name')?.textContent);
+                
                 // 检查是否是配偶关系（通过marriage-connector判断）
                 const connector = node1.nextElementSibling;
+                console.log('连接器元素:', connector);
+                console.log('连接器类名:', connector?.className);
+                
                 if (connector && connector.classList.contains('marriage-connector')) {
+                    console.log('✓ 找到配偶连接器，绘制连接线');
                     const rect1 = node1.getBoundingClientRect();
                     const rect2 = node2.getBoundingClientRect();
                     
@@ -2002,6 +2031,8 @@
                     const x2 = rect2.left - containerRect.left;
                     const y2 = rect2.top + rect2.height / 2 - containerRect.top;
                     
+                    console.log('配偶连接线坐标:', {x1, y1, x2, y2});
+                    
                     const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
                     line.setAttribute('x1', x1);
                     line.setAttribute('y1', y1);
@@ -2009,6 +2040,10 @@
                     line.setAttribute('y2', y2);
                     line.setAttribute('class', 'connection-line spouse');
                     svg.appendChild(line);
+                    
+                    console.log('配偶连接线已添加到SVG');
+                } else {
+                    console.log('✗ 未找到配偶连接器');
                 }
             }
         }
