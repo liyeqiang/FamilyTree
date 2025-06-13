@@ -565,7 +565,7 @@
         .context-menu-item {
             padding: 12px 20px;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s ease;
             font-size: 14px;
             display: flex;
             align-items: center;
@@ -578,6 +578,10 @@
             min-height: 44px;
             box-sizing: border-box;
             position: relative;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
         }
 
         .context-menu-item:hover {
@@ -593,8 +597,14 @@
         }
 
         .context-menu-item:active {
-            background: #e9ecef;
-            transform: translateX(0px);
+            background: #e9ecef !important;
+            transform: translateX(0px) !important;
+            color: #333 !important;
+        }
+
+        .context-menu-item.danger:active {
+            background: #ffcdd2 !important;
+            color: #d32f2f !important;
         }
 
         .context-menu-item:focus {
@@ -1063,13 +1073,13 @@
 
     <!-- 右键菜单 -->
     <div class="context-menu" id="contextMenu">
-        <div class="context-menu-item" onclick="showAddChildModal()">👶 添加子女</div>
-        <div class="context-menu-item" onclick="showAddSpouseModal()">💑 添加配偶</div>
-        <div class="context-menu-item" onclick="showAddFatherModal()">👨 添加父亲</div>
-        <div class="context-menu-item" onclick="showAddMotherModal()">👩 添加母亲</div>
-        <div class="context-menu-item" onclick="showViewDetailsModal()">📋 查看详情</div>
-        <div class="context-menu-item" onclick="editSelectedMember()">✏️ 编辑信息</div>
-        <div class="context-menu-item danger" onclick="deleteSelectedMember()">🗑️ 删除成员</div>
+        <div class="context-menu-item" data-action="addChild">👶 添加子女</div>
+        <div class="context-menu-item" data-action="addSpouse">💑 添加配偶</div>
+        <div class="context-menu-item" data-action="addFather">👨 添加父亲</div>
+        <div class="context-menu-item" data-action="addMother">👩 添加母亲</div>
+        <div class="context-menu-item" data-action="viewDetails">📋 查看详情</div>
+        <div class="context-menu-item" data-action="editMember">✏️ 编辑信息</div>
+        <div class="context-menu-item danger" data-action="deleteMember">🗑️ 删除成员</div>
     </div>
 
     <!-- 添加/编辑成员模态框 -->
@@ -1180,7 +1190,59 @@
             document.getElementById('searchInput').addEventListener('blur', handleSearchBlur);
             
             // 统一的点击事件处理
-            document.addEventListener('click', function(e) {
+            document.addEventListener('click', async function(e) {
+                // 处理右键菜单项点击
+                if (e.target.closest('.context-menu-item')) {
+                    const menuItem = e.target.closest('.context-menu-item');
+                    const action = menuItem.dataset.action;
+                    console.log('右键菜单项被点击，动作:', action, 'contextMenuNode:', contextMenuNode);
+                    
+                    // 阻止事件冒泡
+                    e.stopPropagation();
+                    e.preventDefault();
+                    
+                    // 执行对应的动作
+                    try {
+                        switch(action) {
+                            case 'addChild':
+                                console.log('准备调用 showAddChildModal()');
+                                showAddChildModal();
+                                break;
+                            case 'addSpouse':
+                                console.log('准备调用 showAddSpouseModal()');
+                                showAddSpouseModal();
+                                break;
+                            case 'addFather':
+                                console.log('准备调用 showAddFatherModal()');
+                                await showAddFatherModal();
+                                break;
+                            case 'addMother':
+                                console.log('准备调用 showAddMotherModal()');
+                                await showAddMotherModal();
+                                break;
+                            case 'viewDetails':
+                                console.log('准备调用 showViewDetailsModal()');
+                                await showViewDetailsModal();
+                                break;
+                            case 'editMember':
+                                console.log('准备调用 editSelectedMember()');
+                                await editSelectedMember();
+                                break;
+                            case 'deleteMember':
+                                console.log('准备调用 deleteSelectedMember()');
+                                await deleteSelectedMember();
+                                break;
+                            default:
+                                console.error('未知的菜单动作:', action);
+                        }
+                    } catch (error) {
+                        console.error('执行菜单动作时发生错误:', error);
+                        console.error('动作:', action);
+                        console.error('contextMenuNode:', contextMenuNode);
+                    }
+                    return;
+                }
+                
                 // 处理树节点点击（查看详细信息）
                 if (e.target.closest('.tree-node')) {
                     const nodeElement = e.target.closest('.tree-node');
@@ -2192,7 +2254,9 @@
 
         // 显示右键菜单
         function showContextMenu(event, nodeElement) {
-            console.log('showContextMenu 被调用，参数:', nodeElement);
+            console.log('=== showContextMenu 被调用 ===');
+            console.log('参数:', nodeElement);
+            console.log('事件:', event);
             
             // 如果传入的是数字ID，则查找对应的DOM元素
             if (typeof nodeElement === 'number') {
@@ -2216,6 +2280,8 @@
                 console.error('找不到 contextMenu 元素');
                 return;
             }
+            
+            console.log('contextMenuNode 最终设置为:', contextMenuNode);
             
             // 先显示菜单以获取其尺寸，但放在屏幕外
             menu.style.display = 'block';
@@ -2431,7 +2497,12 @@
 
         // 显示添加配偶模态框
         function showAddSpouseModal() {
-            if (!contextMenuNode) return;
+            console.log('=== showAddSpouseModal 被调用 ===');
+            console.log('contextMenuNode:', contextMenuNode);
+            if (!contextMenuNode) {
+                console.error('contextMenuNode 为空，无法添加配偶');
+                return;
+            }
             
             document.getElementById('modalTitle').textContent = '添加配偶';
             document.getElementById('editingId').value = '';
@@ -2442,11 +2513,56 @@
         }
 
         // 显示添加父亲模态框
-        function showAddFatherModal() {
-            if (!contextMenuNode) return;
+        async function showAddFatherModal() {
+            console.log('=== showAddFatherModal 被调用 ===');
+            console.log('contextMenuNode:', contextMenuNode);
+            if (!contextMenuNode) {
+                console.error('contextMenuNode 为空，无法添加父亲');
+                return;
+            }
             
-            const member = allMembers.find(m => m.individual_id === contextMenuNode);
-            if (!member) return;
+            console.log('allMembers 数组长度:', allMembers.length);
+            console.log('查找成员 ID:', contextMenuNode);
+            let member = allMembers.find(m => m.individual_id === contextMenuNode);
+            console.log('找到的成员:', member);
+            
+            if (!member) {
+                console.error('在 allMembers 中找不到 ID 为', contextMenuNode, '的成员');
+                console.log('allMembers 中的所有ID:', allMembers.map(m => m.individual_id));
+                
+                // 直接从API获取该成员信息
+                console.log('尝试从API获取成员信息...', contextMenuNode);
+                try {
+                    const apiUrl = `/api/v1/individuals/${contextMenuNode}?_=${Date.now()}`;
+                    console.log('API URL:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
+                        headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+                    });
+                    
+                    console.log('API响应状态:', response.status);
+                    
+                    const data = await response.json();
+                    console.log('API响应数据:', data);
+                    
+                    if (data.success && data.data) {
+                        member = data.data;
+                        console.log('从API获取到成员信息:', member);
+                        
+                        // 将该成员添加到allMembers数组中，避免下次再次查询
+                        allMembers.push(member);
+                        console.log('已将成员添加到allMembers数组，新长度:', allMembers.length);
+                    } else {
+                        console.error('API返回失败:', data);
+                        showNotification('无法获取选中成员的信息', 'error');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('API请求失败:', error);
+                    showNotification('网络错误，无法获取成员信息', 'error');
+                    return;
+                }
+            }
             
             // 检查是否已有父亲
             if (member.father_id) {
@@ -2466,11 +2582,56 @@
         }
 
         // 显示添加母亲模态框
-        function showAddMotherModal() {
-            if (!contextMenuNode) return;
+        async function showAddMotherModal() {
+            console.log('=== showAddMotherModal 被调用 ===');
+            console.log('contextMenuNode:', contextMenuNode);
+            if (!contextMenuNode) {
+                console.error('contextMenuNode 为空，无法添加母亲');
+                return;
+            }
             
-            const member = allMembers.find(m => m.individual_id === contextMenuNode);
-            if (!member) return;
+            console.log('allMembers 数组长度:', allMembers.length);
+            console.log('查找成员 ID:', contextMenuNode);
+            let member = allMembers.find(m => m.individual_id === contextMenuNode);
+            console.log('找到的成员:', member);
+            
+            if (!member) {
+                console.error('在 allMembers 中找不到 ID 为', contextMenuNode, '的成员');
+                console.log('allMembers 中的所有ID:', allMembers.map(m => m.individual_id));
+                
+                // 直接从API获取该成员信息
+                console.log('尝试从API获取成员信息...', contextMenuNode);
+                try {
+                    const apiUrl = `/api/v1/individuals/${contextMenuNode}?_=${Date.now()}`;
+                    console.log('API URL:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
+                        headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+                    });
+                    
+                    console.log('API响应状态:', response.status);
+                    
+                    const data = await response.json();
+                    console.log('API响应数据:', data);
+                    
+                    if (data.success && data.data) {
+                        member = data.data;
+                        console.log('从API获取到成员信息:', member);
+                        
+                        // 将该成员添加到allMembers数组中，避免下次再次查询
+                        allMembers.push(member);
+                        console.log('已将成员添加到allMembers数组，新长度:', allMembers.length);
+                    } else {
+                        console.error('API返回失败:', data);
+                        showNotification('无法获取选中成员的信息', 'error');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('API请求失败:', error);
+                    showNotification('网络错误，无法获取成员信息', 'error');
+                    return;
+                }
+            }
             
             // 检查是否已有母亲
             if (member.mother_id) {
@@ -2490,11 +2651,56 @@
         }
 
         // 显示查看详情模态框
-        function showViewDetailsModal() {
-            if (!contextMenuNode) return;
+        async function showViewDetailsModal() {
+            console.log('=== showViewDetailsModal 被调用 ===');
+            console.log('contextMenuNode:', contextMenuNode);
+            if (!contextMenuNode) {
+                console.error('contextMenuNode 为空，无法查看详情');
+                return;
+            }
             
-            const member = allMembers.find(m => m.individual_id === contextMenuNode);
-            if (!member) return;
+            console.log('allMembers 数组长度:', allMembers.length);
+            console.log('查找成员 ID:', contextMenuNode);
+            let member = allMembers.find(m => m.individual_id === contextMenuNode);
+            console.log('找到的成员:', member);
+            
+            if (!member) {
+                console.error('在 allMembers 中找不到 ID 为', contextMenuNode, '的成员');
+                console.log('allMembers 中的所有ID:', allMembers.map(m => m.individual_id));
+                
+                // 直接从API获取该成员信息
+                console.log('尝试从API获取成员信息...', contextMenuNode);
+                try {
+                    const apiUrl = `/api/v1/individuals/${contextMenuNode}?_=${Date.now()}`;
+                    console.log('API URL:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
+                        headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+                    });
+                    
+                    console.log('API响应状态:', response.status);
+                    
+                    const data = await response.json();
+                    console.log('API响应数据:', data);
+                    
+                    if (data.success && data.data) {
+                        member = data.data;
+                        console.log('从API获取到成员信息:', member);
+                        
+                        // 将该成员添加到allMembers数组中，避免下次再次查询
+                        allMembers.push(member);
+                        console.log('已将成员添加到allMembers数组，新长度:', allMembers.length);
+                    } else {
+                        console.error('API返回失败:', data);
+                        showNotification('无法获取选中成员的信息', 'error');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('API请求失败:', error);
+                    showNotification('网络错误，无法获取成员信息', 'error');
+                    return;
+                }
+            }
             
             const content = `
                 <div style="line-height: 1.8;">
@@ -2515,11 +2721,56 @@
         }
 
         // 编辑选中成员
-        function editSelectedMember() {
-            if (!contextMenuNode) return;
+        async function editSelectedMember() {
+            console.log('=== editSelectedMember 被调用 ===');
+            console.log('contextMenuNode:', contextMenuNode);
+            if (!contextMenuNode) {
+                console.error('contextMenuNode 为空，无法编辑成员');
+                return;
+            }
             
-            const member = allMembers.find(m => m.individual_id === contextMenuNode);
-            if (!member) return;
+            console.log('allMembers 数组长度:', allMembers.length);
+            console.log('查找成员 ID:', contextMenuNode);
+            let member = allMembers.find(m => m.individual_id === contextMenuNode);
+            console.log('找到的成员:', member);
+            
+            if (!member) {
+                console.error('在 allMembers 中找不到 ID 为', contextMenuNode, '的成员');
+                console.log('allMembers 中的所有ID:', allMembers.map(m => m.individual_id));
+                
+                // 直接从API获取该成员信息
+                console.log('尝试从API获取成员信息...', contextMenuNode);
+                try {
+                    const apiUrl = `/api/v1/individuals/${contextMenuNode}?_=${Date.now()}`;
+                    console.log('API URL:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
+                        headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+                    });
+                    
+                    console.log('API响应状态:', response.status);
+                    
+                    const data = await response.json();
+                    console.log('API响应数据:', data);
+                    
+                    if (data.success && data.data) {
+                        member = data.data;
+                        console.log('从API获取到成员信息:', member);
+                        
+                        // 将该成员添加到allMembers数组中，避免下次再次查询
+                        allMembers.push(member);
+                        console.log('已将成员添加到allMembers数组，新长度:', allMembers.length);
+                    } else {
+                        console.error('API返回失败:', data);
+                        showNotification('无法获取选中成员的信息', 'error');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('API请求失败:', error);
+                    showNotification('网络错误，无法获取成员信息', 'error');
+                    return;
+                }
+            }
             
             document.getElementById('modalTitle').textContent = '编辑成员信息';
             document.getElementById('editingId').value = member.individual_id;
@@ -2538,10 +2789,55 @@
 
         // 删除选中成员
         async function deleteSelectedMember() {
-            if (!contextMenuNode) return;
+            console.log('=== deleteSelectedMember 被调用 ===');
+            console.log('contextMenuNode:', contextMenuNode);
+            if (!contextMenuNode) {
+                console.error('contextMenuNode 为空，无法删除成员');
+                return;
+            }
             
-            const member = allMembers.find(m => m.individual_id === contextMenuNode);
-            if (!member) return;
+            console.log('allMembers 数组长度:', allMembers.length);
+            console.log('查找成员 ID:', contextMenuNode);
+            let member = allMembers.find(m => m.individual_id === contextMenuNode);
+            console.log('找到的成员:', member);
+            
+            if (!member) {
+                console.error('在 allMembers 中找不到 ID 为', contextMenuNode, '的成员');
+                console.log('allMembers 中的所有ID:', allMembers.map(m => m.individual_id));
+                
+                // 直接从API获取该成员信息
+                console.log('尝试从API获取成员信息...', contextMenuNode);
+                try {
+                    const apiUrl = `/api/v1/individuals/${contextMenuNode}?_=${Date.now()}`;
+                    console.log('API URL:', apiUrl);
+                    
+                    const response = await fetch(apiUrl, {
+                        headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+                    });
+                    
+                    console.log('API响应状态:', response.status);
+                    
+                    const data = await response.json();
+                    console.log('API响应数据:', data);
+                    
+                    if (data.success && data.data) {
+                        member = data.data;
+                        console.log('从API获取到成员信息:', member);
+                        
+                        // 将该成员添加到allMembers数组中，避免下次再次查询
+                        allMembers.push(member);
+                        console.log('已将成员添加到allMembers数组，新长度:', allMembers.length);
+                    } else {
+                        console.error('API返回失败:', data);
+                        showNotification('无法获取选中成员的信息', 'error');
+                        return;
+                    }
+                } catch (error) {
+                    console.error('API请求失败:', error);
+                    showNotification('网络错误，无法获取成员信息', 'error');
+                    return;
+                }
+            }
             
             if (!confirm(`确定要删除 ${member.full_name} 吗？此操作不可撤销。`)) {
                 return;
