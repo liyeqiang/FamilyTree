@@ -142,14 +142,14 @@ func (s *IndividualService) Create(ctx context.Context, req *models.CreateIndivi
 					family.WifeID != nil && *family.WifeID == *req.MotherID {
 					// 创建子女关系记录
 					child := &models.Child{
-						FamilyID:               family.FamilyID,
-						IndividualID:           createdIndividual.IndividualID,
-						RelationshipToParents:  "生子",
+						FamilyID:              family.FamilyID,
+						IndividualID:          createdIndividual.IndividualID,
+						RelationshipToParents: "生子",
 					}
 					if createdIndividual.Gender == models.GenderFemale {
 						child.RelationshipToParents = "生女"
 					}
-					
+
 					s.familyRepo.CreateChild(ctx, child)
 					break
 				}
@@ -302,8 +302,7 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 		req.BirthDate = current.BirthDate
 	}
 	if req.BirthPlace == nil {
-		birthPlace := current.BirthPlace
-		req.BirthPlace = &birthPlace
+		req.BirthPlace = current.BirthPlace
 	}
 	if req.BirthPlaceID == nil {
 		req.BirthPlaceID = current.BirthPlaceID
@@ -312,12 +311,10 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 		req.DeathDate = current.DeathDate
 	}
 	if req.DeathPlace == nil {
-		deathPlace := current.DeathPlace
-		req.DeathPlace = &deathPlace
+		req.DeathPlace = current.DeathPlace
 	}
 	if req.BurialPlace == nil {
-		burialPlace := current.BurialPlace
-		req.BurialPlace = &burialPlace
+		req.BurialPlace = current.BurialPlace
 	}
 	if req.DeathPlaceID == nil {
 		req.DeathPlaceID = current.DeathPlaceID
@@ -340,11 +337,11 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 		FullName:     getStringValue(req.FullName, current.FullName),
 		Gender:       getGenderValue(req.Gender, current.Gender),
 		BirthDate:    req.BirthDate,
-		BirthPlace:   getStringValue(req.BirthPlace, current.BirthPlace),
+		BirthPlace:   getStringPointerValue(req.BirthPlace, current.BirthPlace),
 		BirthPlaceID: req.BirthPlaceID,
 		DeathDate:    req.DeathDate,
-		DeathPlace:   getStringValue(req.DeathPlace, current.DeathPlace),
-		BurialPlace:  getStringValue(req.BurialPlace, current.BurialPlace),
+		DeathPlace:   getStringPointerValue(req.DeathPlace, current.DeathPlace),
+		BurialPlace:  getStringPointerValue(req.BurialPlace, current.BurialPlace),
 		DeathPlaceID: req.DeathPlaceID,
 		Occupation:   getStringValue(req.Occupation, current.Occupation),
 		Notes:        getStringValue(req.Notes, current.Notes),
@@ -359,42 +356,42 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 // validateNoCircularRelationship 验证不存在循环关系
 func (s *IndividualService) validateNoCircularRelationship(ctx context.Context, childID, parentID int, parentType string) error {
 	visited := make(map[int]bool)
-	
+
 	var checkAncestors func(int) error
 	checkAncestors = func(currentID int) error {
 		if visited[currentID] {
 			return fmt.Errorf("检测到循环关系：不能将此人设为%s，因为会形成循环父母关系", parentType)
 		}
-		
+
 		if currentID == childID {
 			return fmt.Errorf("检测到循环关系：不能将此人设为%s，因为会形成循环父母关系", parentType)
 		}
-		
+
 		visited[currentID] = true
-		
+
 		// 获取当前人的父母
 		individual, err := s.repo.GetIndividualByID(ctx, currentID)
 		if err != nil {
 			return nil // 如果获取失败，忽略（可能是数据不存在）
 		}
-		
+
 		// 递归检查父亲
 		if individual.FatherID != nil {
 			if err := checkAncestors(*individual.FatherID); err != nil {
 				return err
 			}
 		}
-		
+
 		// 递归检查母亲
 		if individual.MotherID != nil {
 			if err := checkAncestors(*individual.MotherID); err != nil {
 				return err
 			}
 		}
-		
+
 		return nil
 	}
-	
+
 	return checkAncestors(parentID)
 }
 
@@ -458,10 +455,10 @@ func (s *IndividualService) Delete(ctx context.Context, id int) error {
 	if err != nil {
 		return fmt.Errorf("检查父母关系失败: %v", err)
 	}
-	
+
 	for _, person := range allIndividuals {
 		if (person.FatherID != nil && *person.FatherID == id) ||
-		   (person.MotherID != nil && *person.MotherID == id) {
+			(person.MotherID != nil && *person.MotherID == id) {
 			return fmt.Errorf("该个人被其他人设置为父亲或母亲，不能删除。请先调整相关的父母关系")
 		}
 	}
@@ -755,19 +752,21 @@ func (s *IndividualService) AddParent(ctx context.Context, childID int, req *mod
 
 	// 创建父母个人信息
 	parent := &models.Individual{
-		FullName:     req.FullName,
-		Gender:       req.Gender,
-		BirthDate:    req.BirthDate,
-		BirthPlace:   req.BirthPlace,
-		BirthPlaceID: req.BirthPlaceID,
-		DeathDate:    req.DeathDate,
-		DeathPlace:   req.DeathPlace,
-		DeathPlaceID: req.DeathPlaceID,
-		Occupation:   req.Occupation,
-		Notes:        req.Notes,
-		PhotoURL:     req.PhotoURL,
-		CreatedAt:    time.Now(),
-		UpdatedAt:    time.Now(),
+		FullName:      req.FullName,
+		Gender:        req.Gender,
+		BirthDate:     req.BirthDate,
+		BirthPlace:    req.BirthPlace,
+		BirthPlaceID:  req.BirthPlaceID,
+		DeathDate:     req.DeathDate,
+		DeathPlace:    req.DeathPlace,
+		DeathPlaceID:  req.DeathPlaceID,
+		BurialPlace:   req.BurialPlace,
+		BurialPlaceID: req.BurialPlaceID,
+		Occupation:    req.Occupation,
+		Notes:         req.Notes,
+		PhotoURL:      req.PhotoURL,
+		CreatedAt:     time.Now(),
+		UpdatedAt:     time.Now(),
 	}
 
 	// 创建父母记录
@@ -788,19 +787,21 @@ func (s *IndividualService) AddParent(ctx context.Context, childID int, req *mod
 	var failedUpdates []string
 	for _, sibling := range siblings {
 		updateReq := &models.UpdateIndividualRequest{
-			FullName:     &sibling.FullName,
-			Gender:       &sibling.Gender,
-			BirthDate:    sibling.BirthDate,
-			BirthPlace:   &sibling.BirthPlace,
-			BirthPlaceID: sibling.BirthPlaceID,
-			DeathDate:    sibling.DeathDate,
-			DeathPlace:   &sibling.DeathPlace,
-			DeathPlaceID: sibling.DeathPlaceID,
-			Occupation:   &sibling.Occupation,
-			Notes:        &sibling.Notes,
-			PhotoURL:     sibling.PhotoURL,
-			FatherID:     sibling.FatherID,
-			MotherID:     sibling.MotherID,
+			FullName:      &sibling.FullName,
+			Gender:        &sibling.Gender,
+			BirthDate:     sibling.BirthDate,
+			BirthPlace:    sibling.BirthPlace,
+			BirthPlaceID:  sibling.BirthPlaceID,
+			DeathDate:     sibling.DeathDate,
+			DeathPlace:    sibling.DeathPlace,
+			DeathPlaceID:  sibling.DeathPlaceID,
+			BurialPlace:   sibling.BurialPlace,
+			BurialPlaceID: sibling.BurialPlaceID,
+			Occupation:    &sibling.Occupation,
+			Notes:         &sibling.Notes,
+			PhotoURL:      sibling.PhotoURL,
+			FatherID:      sibling.FatherID,
+			MotherID:      sibling.MotherID,
 		}
 
 		if req.ParentType == "father" {

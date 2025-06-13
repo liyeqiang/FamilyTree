@@ -48,43 +48,45 @@ const (
 
 // Individual 个人信息结构体
 type Individual struct {
-	IndividualID int        `json:"individual_id" db:"individual_id"`
-	FullName     string     `json:"full_name" db:"full_name"`
-	Gender       Gender     `json:"gender" db:"gender"`
-	BirthDate    *time.Time `json:"birth_date" db:"birth_date"`
-	BirthPlace   string     `json:"birth_place" db:"birth_place"` // 出生地点（文本）
-	BirthPlaceID *int       `json:"birth_place_id" db:"birth_place_id"`
-	DeathDate    *time.Time `json:"death_date" db:"death_date"`
-	DeathPlace   string     `json:"death_place" db:"death_place"`   // 埋葬地点（文本）
-	BurialPlace  string     `json:"burial_place" db:"burial_place"` // 埋葬地点（别名，兼容性）
-	DeathPlaceID *int       `json:"death_place_id" db:"death_place_id"`
-	Occupation   string     `json:"occupation" db:"occupation"`
-	Notes        string     `json:"notes" db:"notes"`
-	PhotoURL     *string    `json:"photo_url" db:"photo_url"`
-	FatherID     *int       `json:"father_id" db:"father_id"`
-	MotherID     *int       `json:"mother_id" db:"mother_id"`
-	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at" db:"updated_at"`
+	IndividualID  int        `json:"individual_id" db:"individual_id"`
+	FullName      string     `json:"full_name" db:"full_name"`
+	Gender        Gender     `json:"gender" db:"gender"`
+	BirthDate     *time.Time `json:"birth_date,omitempty" db:"birth_date"`
+	BirthPlace    *string    `json:"birth_place,omitempty" db:"birth_place"`
+	BirthPlaceID  *int       `json:"birth_place_id,omitempty" db:"birth_place_id"`
+	DeathDate     *time.Time `json:"death_date,omitempty" db:"death_date"`
+	DeathPlace    *string    `json:"death_place,omitempty" db:"death_place"`
+	DeathPlaceID  *int       `json:"death_place_id,omitempty" db:"death_place_id"`
+	BurialPlace   *string    `json:"burial_place,omitempty" db:"burial_place"`
+	BurialPlaceID *int       `json:"burial_place_id,omitempty" db:"burial_place_id"`
+	Occupation    string     `json:"occupation,omitempty" db:"occupation"`
+	Notes         string     `json:"notes,omitempty" db:"notes"`
+	PhotoURL      *string    `json:"photo_url,omitempty" db:"photo_url"`
+	FatherID      *int       `json:"father_id,omitempty" db:"father_id"`
+	MotherID      *int       `json:"mother_id,omitempty" db:"mother_id"`
+	CreatedAt     time.Time  `json:"created_at" db:"created_at"`
+	UpdatedAt     time.Time  `json:"updated_at" db:"updated_at"`
 
 	// 关联字段（非数据库字段）
-	BirthPlaceObj *Place       `json:"birth_place_obj,omitempty" db:"-"`
-	DeathPlaceObj *Place       `json:"death_place_obj,omitempty" db:"-"`
-	Father        *Individual  `json:"father,omitempty" db:"-"`
-	Mother        *Individual  `json:"mother,omitempty" db:"-"`
-	Children      []Individual `json:"children,omitempty" db:"-"`
-	MarriageOrder int          `json:"marriage_order,omitempty" db:"-"` // 婚姻顺序（临时字段）
+	BirthPlaceObj  *Place       `json:"birth_place_obj,omitempty" db:"-"`
+	DeathPlaceObj  *Place       `json:"death_place_obj,omitempty" db:"-"`
+	BurialPlaceObj *Place       `json:"burial_place_obj,omitempty" db:"-"`
+	Father         *Individual  `json:"father,omitempty" db:"-"`
+	Mother         *Individual  `json:"mother,omitempty" db:"-"`
+	Children       []Individual `json:"children,omitempty" db:"-"`
+	MarriageOrder  int          `json:"marriage_order,omitempty" db:"-"`
 }
 
 // Family 家庭关系结构体
 type Family struct {
 	FamilyID        int        `json:"family_id" db:"family_id"`
-	HusbandID       *int       `json:"husband_id" db:"husband_id"`
-	WifeID          *int       `json:"wife_id" db:"wife_id"`
-	MarriageOrder   int        `json:"marriage_order" db:"marriage_order"` // 婚姻顺序（第几任妻子）
-	MarriageDate    *time.Time `json:"marriage_date" db:"marriage_date"`
-	MarriagePlaceID *int       `json:"marriage_place_id" db:"marriage_place_id"`
-	DivorceDate     *time.Time `json:"divorce_date" db:"divorce_date"`
-	Notes           string     `json:"notes" db:"notes"`
+	HusbandID       *int       `json:"husband_id,omitempty" db:"husband_id"`
+	WifeID          *int       `json:"wife_id,omitempty" db:"wife_id"`
+	MarriageOrder   int        `json:"marriage_order" db:"marriage_order"`
+	MarriageDate    *time.Time `json:"marriage_date,omitempty" db:"marriage_date"`
+	MarriagePlaceID *int       `json:"marriage_place_id,omitempty" db:"marriage_place_id"`
+	DivorceDate     *time.Time `json:"divorce_date,omitempty" db:"divorce_date"`
+	Notes           string     `json:"notes,omitempty" db:"notes"`
 	CreatedAt       time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at" db:"updated_at"`
 
@@ -114,10 +116,10 @@ type Event struct {
 	EventID      int        `json:"event_id" db:"event_id"`
 	IndividualID int        `json:"individual_id" db:"individual_id"`
 	EventType    string     `json:"event_type" db:"event_type"`
-	EventDate    *time.Time `json:"event_date" db:"event_date"`
-	EventPlaceID *int       `json:"event_place_id" db:"event_place_id"`
+	EventDate    *time.Time `json:"event_date,omitempty" db:"event_date"`
+	EventPlaceID *int       `json:"event_place_id,omitempty" db:"event_place_id"`
 	Description  string     `json:"description" db:"description"`
-	Notes        string     `json:"notes" db:"notes"`
+	Notes        string     `json:"notes,omitempty" db:"notes"`
 	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt    time.Time  `json:"updated_at" db:"updated_at"`
 
@@ -130,9 +132,9 @@ type Event struct {
 type Place struct {
 	PlaceID   int       `json:"place_id" db:"place_id"`
 	PlaceName string    `json:"place_name" db:"place_name"`
-	Latitude  *float64  `json:"latitude" db:"latitude"`
-	Longitude *float64  `json:"longitude" db:"longitude"`
-	Notes     string    `json:"notes" db:"notes"`
+	Latitude  *float64  `json:"latitude,omitempty" db:"latitude"`
+	Longitude *float64  `json:"longitude,omitempty" db:"longitude"`
+	Notes     string    `json:"notes,omitempty" db:"notes"`
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -141,11 +143,11 @@ type Place struct {
 type Source struct {
 	SourceID        int       `json:"source_id" db:"source_id"`
 	Title           string    `json:"title" db:"title"`
-	Author          string    `json:"author" db:"author"`
-	PublicationYear *int      `json:"publication_year" db:"publication_year"`
-	Publisher       string    `json:"publisher" db:"publisher"`
-	Location        string    `json:"location" db:"location"`
-	Notes           string    `json:"notes" db:"notes"`
+	Author          string    `json:"author,omitempty" db:"author"`
+	PublicationYear *int      `json:"publication_year,omitempty" db:"publication_year"`
+	Publisher       string    `json:"publisher,omitempty" db:"publisher"`
+	Location        string    `json:"location,omitempty" db:"location"`
+	Notes           string    `json:"notes,omitempty" db:"notes"`
 	CreatedAt       time.Time `json:"created_at" db:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at" db:"updated_at"`
 }
@@ -156,8 +158,8 @@ type Citation struct {
 	SourceID   int        `json:"source_id" db:"source_id"`
 	EntityType EntityType `json:"entity_type" db:"entity_type"`
 	EntityID   int        `json:"entity_id" db:"entity_id"`
-	PageNumber string     `json:"page_number" db:"page_number"`
-	Notes      string     `json:"notes" db:"notes"`
+	PageNumber string     `json:"page_number,omitempty" db:"page_number"`
+	Notes      string     `json:"notes,omitempty" db:"notes"`
 	CreatedAt  time.Time  `json:"created_at" db:"created_at"`
 	UpdatedAt  time.Time  `json:"updated_at" db:"updated_at"`
 
@@ -177,64 +179,68 @@ type Note struct {
 
 // CreateIndividualRequest 创建个人信息请求
 type CreateIndividualRequest struct {
-	FullName     string     `json:"full_name" binding:"required"`
-	Gender       Gender     `json:"gender"`
-	BirthDate    *time.Time `json:"birth_date"`
-	BirthPlace   string     `json:"birth_place"` // 出生地点
-	BirthPlaceID *int       `json:"birth_place_id"`
-	DeathDate    *time.Time `json:"death_date"`
-	DeathPlace   string     `json:"death_place"`  // 埋葬地点
-	BurialPlace  string     `json:"burial_place"` // 埋葬地点（别名）
-	DeathPlaceID *int       `json:"death_place_id"`
-	Occupation   string     `json:"occupation"`
-	Notes        string     `json:"notes"`
-	PhotoURL     *string    `json:"photo_url"`
-	FatherID     *int       `json:"father_id"`
-	MotherID     *int       `json:"mother_id"`
+	FullName      string     `json:"full_name" binding:"required"`
+	Gender        Gender     `json:"gender"`
+	BirthDate     *time.Time `json:"birth_date,omitempty"`
+	BirthPlace    *string    `json:"birth_place,omitempty"`
+	BirthPlaceID  *int       `json:"birth_place_id,omitempty"`
+	DeathDate     *time.Time `json:"death_date,omitempty"`
+	DeathPlace    *string    `json:"death_place,omitempty"`
+	DeathPlaceID  *int       `json:"death_place_id,omitempty"`
+	BurialPlace   *string    `json:"burial_place,omitempty"`
+	BurialPlaceID *int       `json:"burial_place_id,omitempty"`
+	Occupation    string     `json:"occupation,omitempty"`
+	Notes         string     `json:"notes,omitempty"`
+	PhotoURL      *string    `json:"photo_url,omitempty"`
+	FatherID      *int       `json:"father_id,omitempty"`
+	MotherID      *int       `json:"mother_id,omitempty"`
 }
 
 // UpdateIndividualRequest 更新个人信息请求
 type UpdateIndividualRequest struct {
-	FullName     *string    `json:"full_name"`
-	Gender       *Gender    `json:"gender"`
-	BirthDate    *time.Time `json:"birth_date"`
-	BirthPlace   *string    `json:"birth_place"` // 出生地点
-	BirthPlaceID *int       `json:"birth_place_id"`
-	DeathDate    *time.Time `json:"death_date"`
-	DeathPlace   *string    `json:"death_place"`  // 埋葬地点
-	BurialPlace  *string    `json:"burial_place"` // 埋葬地点（别名）
-	DeathPlaceID *int       `json:"death_place_id"`
-	Occupation   *string    `json:"occupation"`
-	Notes        *string    `json:"notes"`
-	PhotoURL     *string    `json:"photo_url"`
-	FatherID     *int       `json:"father_id"`
-	MotherID     *int       `json:"mother_id"`
+	FullName      *string    `json:"full_name,omitempty"`
+	Gender        *Gender    `json:"gender,omitempty"`
+	BirthDate     *time.Time `json:"birth_date,omitempty"`
+	BirthPlace    *string    `json:"birth_place,omitempty"`
+	BirthPlaceID  *int       `json:"birth_place_id,omitempty"`
+	DeathDate     *time.Time `json:"death_date,omitempty"`
+	DeathPlace    *string    `json:"death_place,omitempty"`
+	DeathPlaceID  *int       `json:"death_place_id,omitempty"`
+	BurialPlace   *string    `json:"burial_place,omitempty"`
+	BurialPlaceID *int       `json:"burial_place_id,omitempty"`
+	Occupation    *string    `json:"occupation,omitempty"`
+	Notes         *string    `json:"notes,omitempty"`
+	PhotoURL      *string    `json:"photo_url,omitempty"`
+	FatherID      *int       `json:"father_id,omitempty"`
+	MotherID      *int       `json:"mother_id,omitempty"`
 }
 
 // CreateFamilyRequest 创建家庭关系请求
 type CreateFamilyRequest struct {
-	HusbandID       *int       `json:"husband_id"`
-	WifeID          *int       `json:"wife_id"`
-	MarriageDate    *time.Time `json:"marriage_date"`
-	MarriagePlaceID *int       `json:"marriage_place_id"`
-	DivorceDate     *time.Time `json:"divorce_date"`
-	Notes           string     `json:"notes"`
+	HusbandID       *int       `json:"husband_id,omitempty"`
+	WifeID          *int       `json:"wife_id,omitempty"`
+	MarriageDate    *time.Time `json:"marriage_date,omitempty"`
+	MarriagePlaceID *int       `json:"marriage_place_id,omitempty"`
+	DivorceDate     *time.Time `json:"divorce_date,omitempty"`
+	Notes           string     `json:"notes,omitempty"`
 }
 
 // AddParentRequest 添加父母请求
 type AddParentRequest struct {
-	FullName     string     `json:"full_name" binding:"required"`
-	ParentType   string     `json:"parent_type" binding:"required"` // "father" 或 "mother"
-	Gender       Gender     `json:"gender"`
-	BirthDate    *time.Time `json:"birth_date"`
-	BirthPlace   string     `json:"birth_place"`
-	BirthPlaceID *int       `json:"birth_place_id"`
-	DeathDate    *time.Time `json:"death_date"`
-	DeathPlace   string     `json:"death_place"`
-	DeathPlaceID *int       `json:"death_place_id"`
-	Occupation   string     `json:"occupation"`
-	Notes        string     `json:"notes"`
-	PhotoURL     *string    `json:"photo_url"`
+	FullName      string     `json:"full_name" binding:"required"`
+	ParentType    string     `json:"parent_type" binding:"required"`
+	Gender        Gender     `json:"gender"`
+	BirthDate     *time.Time `json:"birth_date,omitempty"`
+	BirthPlace    *string    `json:"birth_place,omitempty"`
+	BirthPlaceID  *int       `json:"birth_place_id,omitempty"`
+	DeathDate     *time.Time `json:"death_date,omitempty"`
+	DeathPlace    *string    `json:"death_place,omitempty"`
+	DeathPlaceID  *int       `json:"death_place_id,omitempty"`
+	BurialPlace   *string    `json:"burial_place,omitempty"`
+	BurialPlaceID *int       `json:"burial_place_id,omitempty"`
+	Occupation    string     `json:"occupation,omitempty"`
+	Notes         string     `json:"notes,omitempty"`
+	PhotoURL      *string    `json:"photo_url,omitempty"`
 }
 
 // FamilyTreeNode 家族树节点

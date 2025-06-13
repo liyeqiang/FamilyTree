@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS individuals (
     birth_place_id INTEGER,
     death_date DATE,
     death_place_id INTEGER,
+    burial_place_id INTEGER,
     occupation TEXT,
     notes TEXT,
     photo_url TEXT,
@@ -21,6 +22,7 @@ CREATE TABLE IF NOT EXISTS individuals (
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (birth_place_id) REFERENCES places(place_id),
     FOREIGN KEY (death_place_id) REFERENCES places(place_id),
+    FOREIGN KEY (burial_place_id) REFERENCES places(place_id),
     FOREIGN KEY (father_id) REFERENCES individuals(individual_id),
     FOREIGN KEY (mother_id) REFERENCES individuals(individual_id)
 );
@@ -134,6 +136,7 @@ CREATE INDEX IF NOT EXISTS idx_individuals_name ON individuals(full_name);
 CREATE INDEX IF NOT EXISTS idx_individuals_father ON individuals(father_id);
 CREATE INDEX IF NOT EXISTS idx_individuals_mother ON individuals(mother_id);
 CREATE INDEX IF NOT EXISTS idx_individuals_birth_date ON individuals(birth_date);
+CREATE INDEX IF NOT EXISTS idx_individuals_burial_place ON individuals(burial_place_id);
 CREATE INDEX IF NOT EXISTS idx_places_name ON places(place_name);
 CREATE INDEX IF NOT EXISTS idx_families_husband ON families(husband_id);
 CREATE INDEX IF NOT EXISTS idx_families_wife ON families(wife_id);

@@ -9,10 +9,8 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"os/signal"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"familytree/config"
@@ -65,35 +63,35 @@ func NewDemoRepository() *DemoRepository {
 
 	individuals := []models.Individual{
 		// 第1代（祖父母）
-		{IndividualID: 1, FullName: "张老爷子", Gender: models.GenderMale, BirthDate: &birthDate1920, BirthPlace: "山东省济南市", Occupation: "农民", Notes: "家族始祖", CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 2, FullName: "李老太太", Gender: models.GenderFemale, BirthDate: &birthDate1925, BirthPlace: "河北省石家庄市", Occupation: "家庭主妇", Notes: "张老爷子的妻子", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 1, FullName: "张老爷子", Gender: models.GenderMale, BirthDate: &birthDate1920, BirthPlace: &[]string{"山东省济南市"}[0], Occupation: "农民", Notes: "家族始祖", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 2, FullName: "李老太太", Gender: models.GenderFemale, BirthDate: &birthDate1925, BirthPlace: &[]string{"河北省石家庄市"}[0], Occupation: "家庭主妇", Notes: "张老爷子的妻子", CreatedAt: now, UpdatedAt: now},
 
 		// 第2代（父母）
-		{IndividualID: 3, FullName: "张伟", Gender: models.GenderMale, BirthDate: &birthDate1950, BirthPlace: "北京市朝阳区", Occupation: "工程师", Notes: "张老爷子和李老太太的儿子", FatherID: &[]int{1}[0], MotherID: &[]int{2}[0], CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 4, FullName: "王丽", Gender: models.GenderFemale, BirthDate: &birthDate1955, BirthPlace: "上海市黄浦区", Occupation: "教师", Notes: "张伟的妻子", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 3, FullName: "张伟", Gender: models.GenderMale, BirthDate: &birthDate1950, BirthPlace: &[]string{"北京市朝阳区"}[0], Occupation: "工程师", Notes: "张老爷子和李老太太的儿子", FatherID: &[]int{1}[0], MotherID: &[]int{2}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 4, FullName: "王丽", Gender: models.GenderFemale, BirthDate: &birthDate1955, BirthPlace: &[]string{"上海市黄浦区"}[0], Occupation: "教师", Notes: "张伟的妻子", CreatedAt: now, UpdatedAt: now},
 
 		// 第3代（本人一代）
-		{IndividualID: 5, FullName: "张明", Gender: models.GenderMale, BirthDate: &birthDate1975, BirthPlace: "北京市海淀区", Occupation: "医生", Notes: "张伟和王丽的儿子", FatherID: &[]int{3}[0], MotherID: &[]int{4}[0], CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 6, FullName: "李美", Gender: models.GenderFemale, BirthDate: &birthDate1978, BirthPlace: "天津市和平区", Occupation: "护士", Notes: "张明的妻子", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 5, FullName: "张明", Gender: models.GenderMale, BirthDate: &birthDate1975, BirthPlace: &[]string{"北京市海淀区"}[0], Occupation: "医生", Notes: "张伟和王丽的儿子", FatherID: &[]int{3}[0], MotherID: &[]int{4}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 6, FullName: "李美", Gender: models.GenderFemale, BirthDate: &birthDate1978, BirthPlace: &[]string{"天津市和平区"}[0], Occupation: "护士", Notes: "张明的妻子", CreatedAt: now, UpdatedAt: now},
 
 		// 第4代（子女）
-		{IndividualID: 7, FullName: "张小宝", Gender: models.GenderMale, BirthDate: &birthDate2005, BirthPlace: "北京市西城区", Occupation: "学生", Notes: "张明和李美的儿子", FatherID: &[]int{5}[0], MotherID: &[]int{6}[0], CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 8, FullName: "赵小花", Gender: models.GenderFemale, BirthDate: &birthDate2008, BirthPlace: "广州市天河区", Occupation: "学生", Notes: "张小宝的女友", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 7, FullName: "张小宝", Gender: models.GenderMale, BirthDate: &birthDate2005, BirthPlace: &[]string{"北京市西城区"}[0], Occupation: "学生", Notes: "张明和李美的儿子", FatherID: &[]int{5}[0], MotherID: &[]int{6}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 8, FullName: "赵小花", Gender: models.GenderFemale, BirthDate: &birthDate2008, BirthPlace: &[]string{"广州市天河区"}[0], Occupation: "学生", Notes: "张小宝的女友", CreatedAt: now, UpdatedAt: now},
 
 		// 第5代（孙子女）
-		{IndividualID: 9, FullName: "张小小", Gender: models.GenderMale, BirthDate: &birthDate2030, BirthPlace: "深圳市南山区", Occupation: "程序员", Notes: "张小宝和赵小花的儿子", FatherID: &[]int{7}[0], MotherID: &[]int{8}[0], CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 10, FullName: "陈小雅", Gender: models.GenderFemale, BirthDate: &birthDate2032, BirthPlace: "杭州市西湖区", Occupation: "设计师", Notes: "张小小的妻子", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 9, FullName: "张小小", Gender: models.GenderMale, BirthDate: &birthDate2030, BirthPlace: &[]string{"深圳市南山区"}[0], Occupation: "程序员", Notes: "张小宝和赵小花的儿子", FatherID: &[]int{7}[0], MotherID: &[]int{8}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 10, FullName: "陈小雅", Gender: models.GenderFemale, BirthDate: &birthDate2032, BirthPlace: &[]string{"杭州市西湖区"}[0], Occupation: "设计师", Notes: "张小小的妻子", CreatedAt: now, UpdatedAt: now},
 
 		// 第6代（曾孙）
-		{IndividualID: 11, FullName: "张宝宝", Gender: models.GenderMale, BirthDate: &birthDate2055, BirthPlace: "上海市浦东新区", Occupation: "", Notes: "张小小和陈小雅的儿子", FatherID: &[]int{9}[0], MotherID: &[]int{10}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 11, FullName: "张宝宝", Gender: models.GenderMale, BirthDate: &birthDate2055, BirthPlace: &[]string{"上海市浦东新区"}[0], Occupation: "", Notes: "张小小和陈小雅的儿子", FatherID: &[]int{9}[0], MotherID: &[]int{10}[0], CreatedAt: now, UpdatedAt: now},
 
 		// 添加一夫多妻的演示数据
-		{IndividualID: 12, FullName: "李富贵", Gender: models.GenderMale, BirthDate: &birthDate1970, BirthPlace: "上海", Occupation: "商人", Notes: "有两个妻子的富商", CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 13, FullName: "王美丽", Gender: models.GenderFemale, BirthDate: &birthDate1975, BirthPlace: "上海", Occupation: "家庭主妇", Notes: "李富贵的第一任妻子", CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 14, FullName: "赵小花", Gender: models.GenderFemale, BirthDate: &birthDate1980, BirthPlace: "上海", Occupation: "教师", Notes: "李富贵的第二任妻子", CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 15, FullName: "李大宝", Gender: models.GenderMale, BirthDate: &birthDate1995, BirthPlace: "上海", Notes: "李富贵和王美丽的儿子", FatherID: &[]int{12}[0], MotherID: &[]int{13}[0], CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 16, FullName: "李二宝", Gender: models.GenderFemale, BirthDate: &birthDate1998, BirthPlace: "上海", Notes: "李富贵和王美丽的女儿", FatherID: &[]int{12}[0], MotherID: &[]int{13}[0], CreatedAt: now, UpdatedAt: now},
-		{IndividualID: 17, FullName: "李小花", Gender: models.GenderFemale, BirthDate: &birthDate2005, BirthPlace: "上海", Notes: "李富贵和赵小花的女儿", FatherID: &[]int{12}[0], MotherID: &[]int{14}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 12, FullName: "李富贵", Gender: models.GenderMale, BirthDate: &birthDate1970, BirthPlace: &[]string{"上海"}[0], Occupation: "商人", Notes: "有两个妻子的富商", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 13, FullName: "王美丽", Gender: models.GenderFemale, BirthDate: &birthDate1975, BirthPlace: &[]string{"上海"}[0], Occupation: "家庭主妇", Notes: "李富贵的第一任妻子", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 14, FullName: "赵小花", Gender: models.GenderFemale, BirthDate: &birthDate1980, BirthPlace: &[]string{"上海"}[0], Occupation: "教师", Notes: "李富贵的第二任妻子", CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 15, FullName: "李大宝", Gender: models.GenderMale, BirthDate: &birthDate1995, BirthPlace: &[]string{"上海"}[0], Notes: "李富贵和王美丽的儿子", FatherID: &[]int{12}[0], MotherID: &[]int{13}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 16, FullName: "李二宝", Gender: models.GenderFemale, BirthDate: &birthDate1998, BirthPlace: &[]string{"上海"}[0], Notes: "李富贵和王美丽的女儿", FatherID: &[]int{12}[0], MotherID: &[]int{13}[0], CreatedAt: now, UpdatedAt: now},
+		{IndividualID: 17, FullName: "李小花", Gender: models.GenderFemale, BirthDate: &birthDate2005, BirthPlace: &[]string{"上海"}[0], Notes: "李富贵和赵小花的女儿", FatherID: &[]int{12}[0], MotherID: &[]int{14}[0], CreatedAt: now, UpdatedAt: now},
 	}
 
 	repo.individuals = individuals
@@ -407,24 +405,30 @@ func runSQLiteMode() {
 	fmt.Println("🚀 启动家谱系统（SQLite版）...")
 
 	// 加载配置
-	cfg := config.LoadConfig()
+	dbConfig := config.LoadConfig()
 
 	// 连接数据库
-	db, err := cfg.Connect()
+	db, err := dbConfig.Connect()
 	if err != nil {
 		log.Fatalf("连接数据库失败: %v", err)
 	}
 	defer db.Close()
 
-	// 初始化数据库（创建表和示例数据）
+	// 初始化数据库
 	err = initializeDatabase(db)
 	if err != nil {
 		log.Fatalf("初始化数据库失败: %v", err)
 	}
 
 	// 创建存储库
-	individualRepo := repository.NewSQLiteRepository(db)
-	familyRepo := repository.NewSQLiteRepository(db)
+	individualRepo, err := repository.NewSQLiteRepository(dbConfig.DBPath)
+	if err != nil {
+		log.Fatalf("创建个人信息存储库失败: %v", err)
+	}
+	familyRepo, err := repository.NewSQLiteRepository(dbConfig.DBPath)
+	if err != nil {
+		log.Fatalf("创建家庭存储库失败: %v", err)
+	}
 	individualService := services.NewIndividualService(individualRepo, familyRepo)
 	familyService := services.NewFamilyService(familyRepo, individualRepo)
 
@@ -435,7 +439,7 @@ func runSQLiteMode() {
 	familyHandler := handlers.NewFamilyHandler(familyService)
 
 	// 创建并配置路由器
-	router := setupRouter(individualHandler, familyHandler, "sqlite", cfg.DBPath)
+	router := setupRouter(individualHandler, familyHandler, "sqlite", dbConfig.DBPath)
 
 	// 启动服务器
 	startServer(router)
@@ -629,39 +633,22 @@ func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *h
 
 // startServer 启动HTTP服务器
 func startServer(router *mux.Router) {
-	// 创建HTTP服务器
+	// 添加中间件
+	handler := corsMiddleware(loggingMiddleware(router))
+
+	// 配置服务器
 	server := &http.Server{
 		Addr:         ":8080",
-		Handler:      router,
+		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
 
 	// 启动服务器
-	go func() {
-		fmt.Println("✅ 服务器启动在 http://localhost:8080")
-		fmt.Println("📖 请访问 http://localhost:8080 查看API文档")
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("服务器启动失败: %v", err)
-		}
-	}()
-
-	// 等待中断信号优雅关闭服务器
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	fmt.Println("正在关闭服务器...")
-
-	// 给服务器5秒时间来完成正在处理的请求
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := server.Shutdown(ctx); err != nil {
-		log.Fatalf("服务器强制关闭: %v", err)
-	}
-
-	fmt.Println("服务器已关闭")
+	fmt.Printf("✅ 服务器启动在 http://localhost:8080\n")
+	fmt.Printf("📖 请访问 http://localhost:8080 查看API文档\n")
+	log.Fatal(server.ListenAndServe())
 }
 
 // corsMiddleware CORS中间件

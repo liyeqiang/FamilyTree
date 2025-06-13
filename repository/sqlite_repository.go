@@ -5,76 +5,219 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"familytree/models"
+
+	_ "modernc.org/sqlite"
 )
 
 // SQLiteRepository SQLite数据库存储库实现
 type SQLiteRepository struct {
 	db *sql.DB
+
+	// 预处理语句
+	stmtCache struct {
+		sync.RWMutex
+		statements map[string]*sql.Stmt
+	}
+
+	// 连接池配置
+	maxOpenConns    int
+	maxIdleConns    int
+	connMaxLifetime time.Duration
 }
 
 // NewSQLiteRepository 创建新的SQLite存储库
-func NewSQLiteRepository(db *sql.DB) *SQLiteRepository {
-	return &SQLiteRepository{db: db}
+func NewSQLiteRepository(dbPath string) (*SQLiteRepository, error) {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("打开数据库失败: %v", err)
+	}
+
+	repo := &SQLiteRepository{
+		db: db,
+		stmtCache: struct {
+			sync.RWMutex
+			statements map[string]*sql.Stmt
+		}{
+			statements: make(map[string]*sql.Stmt),
+		},
+		maxOpenConns:    25,
+		maxIdleConns:    10,
+		connMaxLifetime: time.Hour,
+	}
+
+	// 配置连接池
+	db.SetMaxOpenConns(repo.maxOpenConns)
+	db.SetMaxIdleConns(repo.maxIdleConns)
+	db.SetConnMaxLifetime(repo.connMaxLifetime)
+
+	// 初始化预处理语句
+	if err := repo.initPreparedStatements(); err != nil {
+		return nil, fmt.Errorf("初始化预处理语句失败: %v", err)
+	}
+
+	return repo, nil
+}
+
+// initPreparedStatements 初始化所有预处理语句
+func (r *SQLiteRepository) initPreparedStatements() error {
+	statements := map[string]string{
+		"get_individual_by_id": `
+			SELECT individual_id, full_name, gender, birth_date, birth_place, birth_place_id,
+			       death_date, death_place, death_place_id, burial_place_id,
+			       occupation, notes, photo_url, father_id, mother_id, created_at, updated_at
+			FROM individuals WHERE individual_id = ?
+		`,
+		"search_individuals": `
+			SELECT individual_id, full_name, gender, birth_date, birth_place, birth_place_id,
+			       death_date, death_place, death_place_id, burial_place_id,
+			       occupation, notes, photo_url, father_id, mother_id, created_at, updated_at
+			FROM individuals 
+			WHERE full_name LIKE ? OR notes LIKE ?
+			LIMIT ? OFFSET ?
+		`,
+		"create_individual": `
+			INSERT INTO individuals (
+				full_name, gender, birth_date, birth_place, birth_place_id,
+				death_date, death_place, death_place_id, burial_place_id,
+				occupation, notes, photo_url, father_id, mother_id, created_at, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		`,
+		"update_individual": `
+			UPDATE individuals SET
+				full_name = ?, gender = ?, birth_date = ?, birth_place = ?,
+				birth_place_id = ?, death_date = ?, death_place = ?,
+				death_place_id = ?, burial_place_id = ?, occupation = ?, notes = ?,
+				photo_url = ?, father_id = ?, mother_id = ?, updated_at = ?
+			WHERE individual_id = ?
+		`,
+		"delete_individual": `
+			DELETE FROM individuals WHERE individual_id = ?
+		`,
+		"get_children_by_parent": `
+			SELECT individual_id, full_name, gender, birth_date, birth_place, birth_place_id,
+			       death_date, death_place, death_place_id, burial_place_id,
+			       occupation, notes, photo_url, father_id, mother_id, created_at, updated_at
+			FROM individuals 
+			WHERE father_id = ? OR mother_id = ?
+		`,
+		"get_spouses": `
+			SELECT i.individual_id, i.full_name, i.gender, i.birth_date, i.birth_place, i.birth_place_id,
+			       i.death_date, i.death_place, i.death_place_id, i.burial_place_id,
+			       i.occupation, i.notes, i.photo_url, i.father_id, i.mother_id, i.created_at, i.updated_at
+			FROM individuals i
+			JOIN families f ON (f.husband_id = i.individual_id OR f.wife_id = i.individual_id)
+			WHERE (f.husband_id = ? OR f.wife_id = ?)
+			AND i.individual_id != ?
+		`,
+	}
+
+	r.stmtCache.Lock()
+	defer r.stmtCache.Unlock()
+
+	for name, query := range statements {
+		stmt, err := r.db.Prepare(query)
+		if err != nil {
+			return fmt.Errorf("准备语句 %s 失败: %v", name, err)
+		}
+		r.stmtCache.statements[name] = stmt
+	}
+
+	return nil
+}
+
+// getStmt 获取预处理语句
+func (r *SQLiteRepository) getStmt(name string) (*sql.Stmt, error) {
+	r.stmtCache.RLock()
+	stmt, exists := r.stmtCache.statements[name]
+	r.stmtCache.RUnlock()
+
+	if !exists {
+		return nil, fmt.Errorf("预处理语句 %s 不存在", name)
+	}
+
+	return stmt, nil
 }
 
 // Individual相关方法
 
 // CreateIndividual 创建个人信息
 func (r *SQLiteRepository) CreateIndividual(ctx context.Context, individual *models.Individual) (*models.Individual, error) {
-	query := `
-		INSERT INTO individuals (full_name, gender, birth_date, birth_place_id, death_date, 
-		death_place_id, occupation, notes, photo_url, father_id, mother_id)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
-
-	result, err := r.db.ExecContext(ctx, query,
-		individual.FullName, individual.Gender, individual.BirthDate,
-		individual.BirthPlaceID, individual.DeathDate, individual.DeathPlaceID,
-		individual.Occupation, individual.Notes, individual.PhotoURL,
-		individual.FatherID, individual.MotherID)
-
+	stmt, err := r.getStmt("create_individual")
 	if err != nil {
-		return nil, fmt.Errorf("创建个人信息失败: %v", err)
+		return nil, err
+	}
+
+	now := time.Now()
+	individual.CreatedAt = now
+	individual.UpdatedAt = now
+
+	result, err := stmt.ExecContext(ctx,
+		individual.FullName,
+		individual.Gender,
+		individual.BirthDate,
+		individual.BirthPlace,
+		individual.BirthPlaceID,
+		individual.DeathDate,
+		individual.DeathPlace,
+		individual.DeathPlaceID,
+		individual.BurialPlaceID,
+		individual.Occupation,
+		individual.Notes,
+		individual.PhotoURL,
+		individual.FatherID,
+		individual.MotherID,
+		individual.CreatedAt,
+		individual.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	id, err := result.LastInsertId()
 	if err != nil {
-		return nil, fmt.Errorf("获取新插入ID失败: %v", err)
+		return nil, err
 	}
 
 	individual.IndividualID = int(id)
-	individual.CreatedAt = time.Now()
-	individual.UpdatedAt = time.Now()
-
 	return individual, nil
 }
 
 // GetIndividualByID 根据ID获取个人信息
 func (r *SQLiteRepository) GetIndividualByID(ctx context.Context, id int) (*models.Individual, error) {
-	query := `
-		SELECT individual_id, full_name, gender, birth_date, birth_place_id, death_date,
-		death_place_id, occupation, notes, photo_url, father_id, mother_id, created_at, updated_at
-		FROM individuals WHERE individual_id = ?
-	`
+	stmt, err := r.getStmt("get_individual_by_id")
+	if err != nil {
+		return nil, err
+	}
 
 	var individual models.Individual
-	row := r.db.QueryRowContext(ctx, query, id)
-
-	err := row.Scan(
-		&individual.IndividualID, &individual.FullName, &individual.Gender,
-		&individual.BirthDate, &individual.BirthPlaceID, &individual.DeathDate,
-		&individual.DeathPlaceID, &individual.Occupation, &individual.Notes,
-		&individual.PhotoURL, &individual.FatherID, &individual.MotherID,
-		&individual.CreatedAt, &individual.UpdatedAt)
-
+	err = stmt.QueryRowContext(ctx, id).Scan(
+		&individual.IndividualID,
+		&individual.FullName,
+		&individual.Gender,
+		&individual.BirthDate,
+		&individual.BirthPlace,
+		&individual.BirthPlaceID,
+		&individual.DeathDate,
+		&individual.DeathPlace,
+		&individual.DeathPlaceID,
+		&individual.BurialPlaceID,
+		&individual.Occupation,
+		&individual.Notes,
+		&individual.PhotoURL,
+		&individual.FatherID,
+		&individual.MotherID,
+		&individual.CreatedAt,
+		&individual.UpdatedAt,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("个人信息不存在")
 		}
-		return nil, fmt.Errorf("查询个人信息失败: %v", err)
+		return nil, err
 	}
 
 	return &individual, nil
@@ -82,41 +225,64 @@ func (r *SQLiteRepository) GetIndividualByID(ctx context.Context, id int) (*mode
 
 // UpdateIndividual 更新个人信息
 func (r *SQLiteRepository) UpdateIndividual(ctx context.Context, id int, individual *models.Individual) (*models.Individual, error) {
-	query := `
-		UPDATE individuals SET 
-		full_name = ?, gender = ?, birth_date = ?, birth_place_id = ?, death_date = ?,
-		death_place_id = ?, occupation = ?, notes = ?, photo_url = ?, father_id = ?, mother_id = ?, updated_at = ?
-		WHERE individual_id = ?
-	`
-
-	_, err := r.db.ExecContext(ctx, query,
-		individual.FullName, individual.Gender, individual.BirthDate,
-		individual.BirthPlaceID, individual.DeathDate, individual.DeathPlaceID,
-		individual.Occupation, individual.Notes, individual.PhotoURL,
-		individual.FatherID, individual.MotherID, time.Now(), id)
-
+	stmt, err := r.getStmt("update_individual")
 	if err != nil {
-		return nil, fmt.Errorf("更新个人信息失败: %v", err)
+		return nil, err
 	}
 
-	return r.GetIndividualByID(ctx, id)
+	individual.UpdatedAt = time.Now()
+
+	result, err := stmt.ExecContext(ctx,
+		individual.FullName,
+		individual.Gender,
+		individual.BirthDate,
+		individual.BirthPlace,
+		individual.BirthPlaceID,
+		individual.DeathDate,
+		individual.DeathPlace,
+		individual.DeathPlaceID,
+		individual.BurialPlaceID,
+		individual.Occupation,
+		individual.Notes,
+		individual.PhotoURL,
+		individual.FatherID,
+		individual.MotherID,
+		individual.UpdatedAt,
+		id,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if rowsAffected == 0 {
+		return nil, fmt.Errorf("个人信息不存在")
+	}
+
+	individual.IndividualID = id
+	return individual, nil
 }
 
 // DeleteIndividual 删除个人信息
 func (r *SQLiteRepository) DeleteIndividual(ctx context.Context, id int) error {
-	query := `DELETE FROM individuals WHERE individual_id = ?`
-
-	result, err := r.db.ExecContext(ctx, query, id)
+	stmt, err := r.getStmt("delete_individual")
 	if err != nil {
-		return fmt.Errorf("删除个人信息失败: %v", err)
+		return err
 	}
 
-	affected, err := result.RowsAffected()
+	result, err := stmt.ExecContext(ctx, id)
 	if err != nil {
-		return fmt.Errorf("获取影响行数失败: %v", err)
+		return err
 	}
 
-	if affected == 0 {
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
 		return fmt.Errorf("个人信息不存在")
 	}
 
@@ -125,56 +291,51 @@ func (r *SQLiteRepository) DeleteIndividual(ctx context.Context, id int) error {
 
 // SearchIndividuals 搜索个人信息
 func (r *SQLiteRepository) SearchIndividuals(ctx context.Context, query string, limit, offset int) ([]models.Individual, int, error) {
+	stmt, err := r.getStmt("search_individuals")
+	if err != nil {
+		return nil, 0, err
+	}
+
+	searchPattern := "%" + query + "%"
+	rows, err := stmt.QueryContext(ctx, searchPattern, searchPattern, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
 	var individuals []models.Individual
-	var args []interface{}
-
-	baseQuery := `
-		SELECT individual_id, full_name, gender, birth_date, birth_place_id, death_date,
-		death_place_id, occupation, notes, photo_url, father_id, mother_id, created_at, updated_at
-		FROM individuals
-	`
-
-	countQuery := "SELECT COUNT(*) FROM individuals"
-
-	if query != "" {
-		whereClause := " WHERE full_name LIKE ? OR occupation LIKE ? OR notes LIKE ?"
-		baseQuery += whereClause
-		countQuery += whereClause
-		searchTerm := "%" + query + "%"
-		args = append(args, searchTerm, searchTerm, searchTerm)
+	for rows.Next() {
+		var individual models.Individual
+		err := rows.Scan(
+			&individual.IndividualID,
+			&individual.FullName,
+			&individual.Gender,
+			&individual.BirthDate,
+			&individual.BirthPlace,
+			&individual.BirthPlaceID,
+			&individual.DeathDate,
+			&individual.DeathPlace,
+			&individual.DeathPlaceID,
+			&individual.BurialPlaceID,
+			&individual.Occupation,
+			&individual.Notes,
+			&individual.PhotoURL,
+			&individual.FatherID,
+			&individual.MotherID,
+			&individual.CreatedAt,
+			&individual.UpdatedAt,
+		)
+		if err != nil {
+			return nil, 0, err
+		}
+		individuals = append(individuals, individual)
 	}
 
 	// 获取总数
 	var total int
-	err := r.db.QueryRowContext(ctx, countQuery, args...).Scan(&total)
+	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM individuals WHERE full_name LIKE ? OR notes LIKE ?", searchPattern, searchPattern).Scan(&total)
 	if err != nil {
-		return nil, 0, fmt.Errorf("获取搜索结果总数失败: %v", err)
-	}
-
-	// 获取分页结果
-	baseQuery += " ORDER BY created_at DESC LIMIT ? OFFSET ?"
-	args = append(args, limit, offset)
-
-	rows, err := r.db.QueryContext(ctx, baseQuery, args...)
-	if err != nil {
-		return nil, 0, fmt.Errorf("搜索个人信息失败: %v", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var individual models.Individual
-		err := rows.Scan(
-			&individual.IndividualID, &individual.FullName, &individual.Gender,
-			&individual.BirthDate, &individual.BirthPlaceID, &individual.DeathDate,
-			&individual.DeathPlaceID, &individual.Occupation, &individual.Notes,
-			&individual.PhotoURL, &individual.FatherID, &individual.MotherID,
-			&individual.CreatedAt, &individual.UpdatedAt)
-
-		if err != nil {
-			return nil, 0, fmt.Errorf("扫描搜索结果失败: %v", err)
-		}
-
-		individuals = append(individuals, individual)
+		return nil, 0, err
 	}
 
 	return individuals, total, nil
@@ -182,16 +343,14 @@ func (r *SQLiteRepository) SearchIndividuals(ctx context.Context, query string, 
 
 // GetIndividualsByParentID 根据父母ID获取子女
 func (r *SQLiteRepository) GetIndividualsByParentID(ctx context.Context, parentID int) ([]models.Individual, error) {
-	query := `
-		SELECT individual_id, full_name, gender, birth_date, birth_place_id, death_date,
-		death_place_id, occupation, notes, photo_url, father_id, mother_id, created_at, updated_at
-		FROM individuals WHERE father_id = ? OR mother_id = ?
-		ORDER BY birth_date
-	`
-
-	rows, err := r.db.QueryContext(ctx, query, parentID, parentID)
+	stmt, err := r.getStmt("get_children_by_parent")
 	if err != nil {
-		return nil, fmt.Errorf("查询子女信息失败: %v", err)
+		return nil, err
+	}
+
+	rows, err := stmt.QueryContext(ctx, parentID, parentID)
+	if err != nil {
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -199,16 +358,27 @@ func (r *SQLiteRepository) GetIndividualsByParentID(ctx context.Context, parentI
 	for rows.Next() {
 		var individual models.Individual
 		err := rows.Scan(
-			&individual.IndividualID, &individual.FullName, &individual.Gender,
-			&individual.BirthDate, &individual.BirthPlaceID, &individual.DeathDate,
-			&individual.DeathPlaceID, &individual.Occupation, &individual.Notes,
-			&individual.PhotoURL, &individual.FatherID, &individual.MotherID,
-			&individual.CreatedAt, &individual.UpdatedAt)
-
+			&individual.IndividualID,
+			&individual.FullName,
+			&individual.Gender,
+			&individual.BirthDate,
+			&individual.BirthPlace,
+			&individual.BirthPlaceID,
+			&individual.DeathDate,
+			&individual.DeathPlace,
+			&individual.DeathPlaceID,
+			&individual.BurialPlaceID,
+			&individual.Occupation,
+			&individual.Notes,
+			&individual.PhotoURL,
+			&individual.FatherID,
+			&individual.MotherID,
+			&individual.CreatedAt,
+			&individual.UpdatedAt,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("扫描子女信息失败: %v", err)
+			return nil, err
 		}
-
 		individuals = append(individuals, individual)
 	}
 
@@ -223,8 +393,8 @@ func (r *SQLiteRepository) GetIndividualsByIDs(ctx context.Context, ids []int) (
 
 	placeholders := strings.Repeat("?,", len(ids)-1) + "?"
 	query := fmt.Sprintf(`
-		SELECT individual_id, full_name, gender, birth_date, birth_place_id, death_date,
-		death_place_id, occupation, notes, photo_url, father_id, mother_id, created_at, updated_at
+		SELECT individual_id, full_name, gender, birth_date, birth_place, birth_place_id, death_date,
+		death_place, death_place_id, burial_place_id, occupation, notes, photo_url, father_id, mother_id, created_at, updated_at
 		FROM individuals WHERE individual_id IN (%s)
 	`, placeholders)
 
@@ -244,8 +414,8 @@ func (r *SQLiteRepository) GetIndividualsByIDs(ctx context.Context, ids []int) (
 		var individual models.Individual
 		err := rows.Scan(
 			&individual.IndividualID, &individual.FullName, &individual.Gender,
-			&individual.BirthDate, &individual.BirthPlaceID, &individual.DeathDate,
-			&individual.DeathPlaceID, &individual.Occupation, &individual.Notes,
+			&individual.BirthDate, &individual.BirthPlace, &individual.BirthPlaceID, &individual.DeathDate,
+			&individual.DeathPlace, &individual.DeathPlaceID, &individual.BurialPlaceID, &individual.Occupation, &individual.Notes,
 			&individual.PhotoURL, &individual.FatherID, &individual.MotherID,
 			&individual.CreatedAt, &individual.UpdatedAt)
 
@@ -287,8 +457,8 @@ func (r *SQLiteRepository) GetSiblings(ctx context.Context, individualID int) ([
 	}
 
 	query := `
-		SELECT individual_id, full_name, gender, birth_date, birth_place_id, death_date,
-		death_place_id, occupation, notes, photo_url, father_id, mother_id, created_at, updated_at
+		SELECT individual_id, full_name, gender, birth_date, birth_place, birth_place_id, death_date,
+		death_place, death_place_id, burial_place_id, occupation, notes, photo_url, father_id, mother_id, created_at, updated_at
 		FROM individuals 
 		WHERE individual_id != ? AND (
 			(father_id = ? AND father_id IS NOT NULL) OR 
@@ -308,8 +478,8 @@ func (r *SQLiteRepository) GetSiblings(ctx context.Context, individualID int) ([
 		var sibling models.Individual
 		err := rows.Scan(
 			&sibling.IndividualID, &sibling.FullName, &sibling.Gender,
-			&sibling.BirthDate, &sibling.BirthPlaceID, &sibling.DeathDate,
-			&sibling.DeathPlaceID, &sibling.Occupation, &sibling.Notes,
+			&sibling.BirthDate, &sibling.BirthPlace, &sibling.BirthPlaceID, &sibling.DeathDate,
+			&sibling.DeathPlace, &sibling.DeathPlaceID, &sibling.BurialPlaceID, &sibling.Occupation, &sibling.Notes,
 			&sibling.PhotoURL, &sibling.FatherID, &sibling.MotherID,
 			&sibling.CreatedAt, &sibling.UpdatedAt)
 
@@ -325,65 +495,42 @@ func (r *SQLiteRepository) GetSiblings(ctx context.Context, individualID int) ([
 
 // GetSpouses 获取配偶
 func (r *SQLiteRepository) GetSpouses(ctx context.Context, individualID int) ([]models.Individual, error) {
-	// 首先获取个人信息以确定性别
-	individual, err := r.GetIndividualByID(ctx, individualID)
+	stmt, err := r.getStmt("get_spouses")
 	if err != nil {
-		return nil, fmt.Errorf("获取个人信息失败: %v", err)
+		return nil, err
 	}
 
-	var query string
-	if individual.Gender == models.GenderMale {
-		// 如果是男性，获取所有妻子
-		query = `
-			SELECT i.individual_id, i.full_name, i.gender, i.birth_date, 
-			       i.birth_place_id, i.death_date, i.death_place_id, 
-			       i.occupation, i.notes, i.photo_url, 
-			       i.father_id, i.mother_id, i.created_at, i.updated_at,
-			       f.marriage_order
-			FROM individuals i
-			JOIN families f ON f.wife_id = i.individual_id
-			WHERE f.husband_id = ?
-			ORDER BY f.marriage_order, f.created_at
-		`
-	} else {
-		// 如果是女性，获取所有丈夫
-		query = `
-			SELECT i.individual_id, i.full_name, i.gender, i.birth_date, 
-			       i.birth_place_id, i.death_date, i.death_place_id, 
-			       i.occupation, i.notes, i.photo_url, 
-			       i.father_id, i.mother_id, i.created_at, i.updated_at,
-			       f.marriage_order
-			FROM individuals i
-			JOIN families f ON f.husband_id = i.individual_id
-			WHERE f.wife_id = ?
-			ORDER BY f.marriage_order, f.created_at
-		`
-	}
-
-	rows, err := r.db.QueryContext(ctx, query, individualID)
+	rows, err := stmt.QueryContext(ctx, individualID, individualID, individualID)
 	if err != nil {
-		return nil, fmt.Errorf("查询配偶失败: %v", err)
+		return nil, err
 	}
 	defer rows.Close()
 
 	var spouses []models.Individual
 	for rows.Next() {
 		var spouse models.Individual
-		var marriageOrder int
-
 		err := rows.Scan(
-			&spouse.IndividualID, &spouse.FullName, &spouse.Gender,
-			&spouse.BirthDate, &spouse.BirthPlaceID, &spouse.DeathDate,
-			&spouse.DeathPlaceID, &spouse.Occupation, &spouse.Notes,
-			&spouse.PhotoURL, &spouse.FatherID, &spouse.MotherID,
-			&spouse.CreatedAt, &spouse.UpdatedAt, &marriageOrder)
-
+			&spouse.IndividualID,
+			&spouse.FullName,
+			&spouse.Gender,
+			&spouse.BirthDate,
+			&spouse.BirthPlace,
+			&spouse.BirthPlaceID,
+			&spouse.DeathDate,
+			&spouse.DeathPlace,
+			&spouse.DeathPlaceID,
+			&spouse.BurialPlaceID,
+			&spouse.Occupation,
+			&spouse.Notes,
+			&spouse.PhotoURL,
+			&spouse.FatherID,
+			&spouse.MotherID,
+			&spouse.CreatedAt,
+			&spouse.UpdatedAt,
+		)
 		if err != nil {
-			return nil, fmt.Errorf("扫描配偶信息失败: %v", err)
+			return nil, err
 		}
-
-		// 将 marriage_order 信息设置到 Individual 结构体中
-		spouse.MarriageOrder = marriageOrder
 		spouses = append(spouses, spouse)
 	}
 
@@ -693,4 +840,14 @@ func (r *SQLiteRepository) GetChildrenByFamilyID(ctx context.Context, familyID i
 	}
 
 	return children, nil
+}
+
+// Close 关闭数据库连接
+func (r *SQLiteRepository) Close() error {
+	r.stmtCache.Lock()
+	for _, stmt := range r.stmtCache.statements {
+		stmt.Close()
+	}
+	r.stmtCache.Unlock()
+	return r.db.Close()
 }
