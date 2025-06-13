@@ -9,18 +9,69 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 
 	"familytree/config"
 	"familytree/handlers"
 	"familytree/models"
+	"familytree/pkg/di"
+	"familytree/pkg/workerpool"
 	"familytree/repository"
 	"familytree/services"
 
 	"github.com/gorilla/mux"
 )
+
+// AppConfig 应用配置
+type AppConfig struct {
+	Mode         string `json:"mode"`
+	Port         string `json:"port"`
+	DBPath       string `json:"db_path"`
+	RedisEnabled bool   `json:"redis_enabled"`
+	WorkerCount  int    `json:"worker_count"`
+	CacheEnabled bool   `json:"cache_enabled"`
+	LogLevel     string `json:"log_level"`
+}
+
+// DefaultAppConfig 默认应用配置
+func DefaultAppConfig() *AppConfig {
+	return &AppConfig{
+		Mode:         "demo",
+		Port:         "8080",
+		DBPath:       "familytree.db",
+		RedisEnabled: false,
+		WorkerCount:  10,
+		CacheEnabled: true,
+		LogLevel:     "info",
+	}
+}
+
+// loadConfig 加载配置
+func loadConfig() *AppConfig {
+	config := DefaultAppConfig()
+
+	// 从环境变量读取配置
+	if mode := os.Getenv("APP_MODE"); mode != "" {
+		config.Mode = mode
+	}
+	if port := os.Getenv("PORT"); port != "" {
+		config.Port = port
+	}
+	if dbPath := os.Getenv("DB_PATH"); dbPath != "" {
+		config.DBPath = dbPath
+	}
+
+	// 尝试从配置文件读取
+	if data, err := ioutil.ReadFile("config.json"); err == nil {
+		json.Unmarshal(data, config)
+	}
+
+	return config
+}
 
 // DemoRepository 内存存储库用于演示模式
 type DemoRepository struct {
@@ -359,28 +410,100 @@ func (r *DemoRepository) BuildFamilyTree(ctx context.Context, rootID int, genera
 }
 
 func main() {
-	// 检查命令行参数
-	mode := "demo"
+	// 加载配置
+	appConfig := loadConfig()
+
+	// 检查命令行参数覆盖配置
 	if len(os.Args) > 1 {
-		mode = os.Args[1]
+		appConfig.Mode = os.Args[1]
 	}
 
-	switch mode {
-	case "sqlite", "db":
-		runSQLiteMode()
+	// 设置日志
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.Printf("🚀 启动家族树应用，模式: %s, 端口: %s", appConfig.Mode, appConfig.Port)
+
+	// 创建依赖注入容器
+	container := di.NewContainer()
+
+	// 创建工作池
+	var workerPool *workerpool.Pool
+	if appConfig.WorkerCount > 0 {
+		workerPool = workerpool.NewPool(appConfig.WorkerCount)
+		defer workerPool.Stop()
+	}
+
+	// 创建应用实例
+	app, err := createApp(appConfig, container, workerPool)
+	if err != nil {
+		log.Fatalf("创建应用失败: %v", err)
+	}
+	defer app.cleanup()
+
+	// 启动服务器
+	server := &http.Server{
+		Addr:         ":" + appConfig.Port,
+		Handler:      app.router,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
+
+	// 优雅关闭
+	go func() {
+		log.Printf("服务器启动在端口 %s", appConfig.Port)
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("服务器启动失败: %v", err)
+		}
+	}()
+
+	// 等待中断信号
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("正在关闭服务器...")
+
+	// 优雅关闭服务器
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctx); err != nil {
+		log.Printf("服务器强制关闭: %v", err)
+	}
+
+	log.Println("服务器已关闭")
+}
+
+// App 应用实例
+type App struct {
+	router  *mux.Router
+	db      *sql.DB
+	cache   *repository.CacheRepository
+	cleanup func()
+}
+
+// createApp 创建应用实例
+func createApp(config *AppConfig, container *di.Container, workerPool *workerpool.Pool) (*App, error) {
+	var cleanupFuncs []func()
+
+	cleanup := func() {
+		for _, fn := range cleanupFuncs {
+			fn()
+		}
+	}
+
+	switch config.Mode {
 	case "demo", "memory":
-		runDemoMode()
+		return createDemoApp(config, container, cleanup)
+	case "sqlite", "db":
+		return createSQLiteApp(config, container, cleanup)
 	default:
-		fmt.Println("用法: go run main.go [demo|sqlite]")
-		fmt.Println("  demo   - 内存演示模式（默认）")
-		fmt.Println("  sqlite - SQLite数据库模式")
-		os.Exit(1)
+		return nil, fmt.Errorf("未知模式: %s，支持的模式: demo, sqlite", config.Mode)
 	}
 }
 
-// runDemoMode 运行演示模式（内存存储）
-func runDemoMode() {
-	fmt.Println("🚀 启动家谱系统（内存演示版）...")
+// createDemoApp 创建演示模式应用
+func createDemoApp(config *AppConfig, container *di.Container, cleanup func()) (*App, error) {
+	log.Println("创建内存演示版应用...")
 
 	// 创建演示存储库
 	repo := NewDemoRepository()
@@ -394,55 +517,95 @@ func runDemoMode() {
 	familyHandler := handlers.NewFamilyHandler(familyService)
 
 	// 创建并配置路由器
-	router := setupRouter(individualHandler, familyHandler, "demo", "")
+	router := setupRouter(individualHandler, familyHandler, config.Mode, "")
 
-	// 启动服务器
-	startServer(router)
+	return &App{
+		router:  router,
+		cleanup: cleanup,
+	}, nil
 }
 
-// runSQLiteMode 运行SQLite数据库模式
-func runSQLiteMode() {
-	fmt.Println("🚀 启动家谱系统（SQLite版）...")
+// runDemoMode 运行演示模式（内存存储）- 保持向后兼容
+func runDemoMode() {
+	config := DefaultAppConfig()
+	config.Mode = "demo"
 
-	// 加载配置
+	app, err := createDemoApp(config, di.NewContainer(), func() {})
+	if err != nil {
+		log.Fatalf("创建演示应用失败: %v", err)
+	}
+
+	// 启动服务器
+	startServer(app.router)
+}
+
+// createSQLiteApp 创建SQLite模式应用
+func createSQLiteApp(appConfig *AppConfig, container *di.Container, cleanup func()) (*App, error) {
+	log.Println("创建SQLite数据库版应用...")
+
+	// 加载数据库配置
 	dbConfig := config.LoadConfig()
 
 	// 连接数据库
 	db, err := dbConfig.Connect()
 	if err != nil {
-		log.Fatalf("连接数据库失败: %v", err)
+		return nil, fmt.Errorf("连接数据库失败: %v", err)
 	}
-	defer db.Close()
+
+	// 添加数据库关闭到清理函数
+	originalCleanup := cleanup
+	cleanup = func() {
+		db.Close()
+		originalCleanup()
+	}
 
 	// 初始化数据库
 	err = initializeDatabase(db)
 	if err != nil {
-		log.Fatalf("初始化数据库失败: %v", err)
+		return nil, fmt.Errorf("初始化数据库失败: %v", err)
 	}
 
 	// 创建存储库
-	individualRepo, err := repository.NewSQLiteRepository(dbConfig.DBPath)
+	individualRepo, err := repository.NewSQLiteRepository(appConfig.DBPath)
 	if err != nil {
-		log.Fatalf("创建个人信息存储库失败: %v", err)
+		return nil, fmt.Errorf("创建个人信息存储库失败: %v", err)
 	}
-	familyRepo, err := repository.NewSQLiteRepository(dbConfig.DBPath)
+	familyRepo, err := repository.NewSQLiteRepository(appConfig.DBPath)
 	if err != nil {
-		log.Fatalf("创建家庭存储库失败: %v", err)
+		return nil, fmt.Errorf("创建家庭存储库失败: %v", err)
 	}
+
+	// 创建服务
 	individualService := services.NewIndividualService(individualRepo, familyRepo)
 	familyService := services.NewFamilyService(familyRepo, individualRepo)
 
 	// 创建处理器
 	individualHandler := handlers.NewIndividualHandler(individualService)
-
-	// 创建家庭服务
 	familyHandler := handlers.NewFamilyHandler(familyService)
 
 	// 创建并配置路由器
-	router := setupRouter(individualHandler, familyHandler, "sqlite", dbConfig.DBPath)
+	router := setupRouter(individualHandler, familyHandler, appConfig.Mode, appConfig.DBPath)
+
+	return &App{
+		router:  router,
+		db:      db,
+		cleanup: cleanup,
+	}, nil
+}
+
+// runSQLiteMode 运行SQLite数据库模式 - 保持向后兼容
+func runSQLiteMode() {
+	config := DefaultAppConfig()
+	config.Mode = "sqlite"
+
+	app, err := createSQLiteApp(config, di.NewContainer(), func() {})
+	if err != nil {
+		log.Fatalf("创建SQLite应用失败: %v", err)
+	}
+	defer app.cleanup()
 
 	// 启动服务器
-	startServer(router)
+	startServer(app.router)
 }
 
 // setupRouter 设置路由器
