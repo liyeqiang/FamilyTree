@@ -1721,7 +1721,43 @@
             // 获取每个父节点的子节点
             console.log('=== 开始构建父子关系映射 ===');
             
-            parentNodes.forEach(parentNode => {
+            // 用于跟踪已经处理过的子女，避免夫妻重复连接
+            const processedChildren = new Set();
+            
+            // 首先处理所有男性父节点（父亲）
+            const maleParents = Array.from(parentNodes).filter(node => {
+                const parentId = parseInt(node.dataset.id);
+                // 从树结构中找到对应的成员信息
+                for (let level = 0; level < treeStructure.levels.length; level++) {
+                    const member = treeStructure.levels[level].members.find(m => 
+                        m.individual.individual_id === parentId
+                    );
+                    if (member && member.individual.gender === 'male') {
+                        return true;
+                    }
+                }
+                return false;
+            });
+            
+            // 然后处理所有女性父节点（母亲）
+            const femaleParents = Array.from(parentNodes).filter(node => {
+                const parentId = parseInt(node.dataset.id);
+                // 从树结构中找到对应的成员信息
+                for (let level = 0; level < treeStructure.levels.length; level++) {
+                    const member = treeStructure.levels[level].members.find(m => 
+                        m.individual.individual_id === parentId
+                    );
+                    if (member && member.individual.gender === 'female') {
+                        return true;
+                    }
+                }
+                return false;
+            });
+            
+            // 按顺序处理：先父亲，后母亲
+            const orderedParents = [...maleParents, ...femaleParents];
+            
+            orderedParents.forEach(parentNode => {
                 const parentId = parseInt(parentNode.dataset.id);
                 const parentName = parentNode.querySelector('.node-name').textContent;
                 const children = [];
@@ -1731,11 +1767,20 @@
                 childNodes.forEach(childNode => {
                     const childId = parseInt(childNode.dataset.id);
                     const childName = childNode.querySelector('.node-name').textContent;
+                    
+                    // 如果这个子女已经被处理过（通常是被父亲处理），跳过
+                    if (processedChildren.has(childId)) {
+                        console.log(`  跳过子节点: ${childName} (已被其他父母连接)`);
+                        return;
+                    }
+                    
                     console.log(`  检查子节点: ${childName} (ID: ${childId})`);
                     
                     if (isParentChild(parentId, childId, treeStructure)) {
                         console.log(`  ✓ 找到父子关系: ${parentName} -> ${childName}`);
                         children.push(childNode);
+                        // 标记这个子女已被处理，避免其他父母重复连接
+                        processedChildren.add(childId);
                     } else {
                         console.log(`  ✗ 无父子关系: ${parentName} -> ${childName}`);
                     }
@@ -1931,7 +1976,7 @@
                     
                     path.setAttribute('d', pathData);
                     path.setAttribute('class', 'connection-line parent-child');
-                    path.setAttribute('stroke-dasharray', index > 0 ? '3,3' : 'none'); // 非第一个父节点使用虚线
+                    path.setAttribute('stroke-dasharray', 'none'); // 统一使用实线，不再区分第一个和其他父节点
                     svg.appendChild(path);
                 });
             });
@@ -1993,278 +2038,7 @@
             return `第${level - rootLevel + 1}代`;
         }
 
-        // 绘制连接线
-        function drawConnections(treeStructure) {
-            const svg = document.getElementById('treeConnections');
-            if (!svg) return;
-            
-            svg.innerHTML = ''; // 清空现有连接线
-            
-            const treeWrapper = svg.parentElement;
-            const rect = treeWrapper.getBoundingClientRect();
-            svg.setAttribute('width', rect.width);
-            svg.setAttribute('height', rect.height);
-            
-            // 绘制父子连接线
-            for (let level = 0; level < treeStructure.levels.length - 1; level++) {
-                const currentLevel = treeWrapper.querySelector(`[data-level="${level}"]`);
-                const nextLevel = treeWrapper.querySelector(`[data-level="${level + 1}"]`);
-                
-                if (currentLevel && nextLevel) {
-                    drawParentChildConnections(svg, currentLevel, nextLevel, treeWrapper, treeStructure);
-                }
-            }
-            
-            // 绘制配偶连接线
-            treeStructure.levels.forEach((levelData, level) => {
-                const levelElement = treeWrapper.querySelector(`[data-level="${level}"]`);
-                if (levelElement) {
-                    drawSpouseConnections(svg, levelElement, treeWrapper);
-                }
-            });
-        }
-
-        // 绘制父子连接线
-        function drawParentChildConnections(svg, parentLevel, childLevel, container, treeStructure) {
-            const parentNodes = parentLevel.querySelectorAll('.tree-node:not(.spouse-node)');
-            const childNodes = childLevel.querySelectorAll('.tree-node:not(.spouse-node)');
-            
-            if (parentNodes.length === 0 || childNodes.length === 0) return;
-            
-            const containerRect = container.getBoundingClientRect();
-            
-            // 构建父子关系映射
-            const parentChildMap = new Map();
-            
-            // 获取每个父节点的子节点
-            parentNodes.forEach(parentNode => {
-                const parentId = parseInt(parentNode.dataset.id);
-                const children = [];
-                
-                childNodes.forEach(childNode => {
-                    const childId = parseInt(childNode.dataset.id);
-                    if (isParentChild(parentId, childId, treeStructure)) {
-                        children.push(childNode);
-                    }
-                });
-                
-                if (children.length > 0) {
-                    parentChildMap.set(parentNode, children);
-                }
-            });
-            
-            // 如果只有一个父节点，使用简单连接
-            if (parentChildMap.size === 1) {
-                const [parentNode, children] = parentChildMap.entries().next().value;
-                drawSimpleParentChildConnection(svg, parentNode, children, containerRect);
-            } else {
-                // 多个父节点时，使用分层连接避免相交
-                drawMultiParentChildConnections(svg, parentChildMap, containerRect);
-            }
-        }
         
-        // 检查是否为父子关系（基于树结构数据）
-        function isParentChild(parentId, childId, treeStructure) {
-            // 测试函数是否被调用 - 检查任何父子关系
-            console.log('=== 检查父子关系 (修复版) ===');
-            console.log('父ID:', parentId, '子ID:', childId);
-            
-            // 遍历树结构，查找父子关系
-            for (let level = 0; level < treeStructure.levels.length - 1; level++) {
-                const currentLevelMembers = treeStructure.levels[level].members;
-                const nextLevelMembers = treeStructure.levels[level + 1].members;
-                
-                console.log(`检查层级 ${level} -> ${level + 1}`);
-                console.log('当前层成员:', currentLevelMembers.map(m => ({id: m.individual.individual_id, name: m.individual.full_name, isSpouse: m.isSpouse})));
-                console.log('下一层成员:', nextLevelMembers.map(m => ({id: m.individual.individual_id, name: m.individual.full_name, isSpouse: m.isSpouse})));
-                
-                // 检查父节点是否在当前层（包括配偶，因为配偶也可能是父母）
-                const parentMember = currentLevelMembers.find(m => 
-                    m.individual.individual_id === parentId
-                );
-                
-                if (parentMember) {
-                    console.log('找到父节点:', parentMember.individual.full_name);
-                    
-                    // 检查子节点是否在下一层
-                    const childMember = nextLevelMembers.find(m => 
-                        !m.isSpouse && m.individual.individual_id === childId
-                    );
-                    
-                    if (childMember) {
-                        console.log('找到子节点:', childMember.individual.full_name);
-                        console.log('子节点的父亲ID:', childMember.individual.father_id);
-                        console.log('子节点的母亲ID:', childMember.individual.mother_id);
-                        
-                        // 检查实际的父子关系
-                        const isParent = (childMember.individual.father_id === parentId || 
-                                         childMember.individual.mother_id === parentId);
-                        console.log('是否为父子关系:', isParent);
-                        
-                        if (isParent) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            console.log('未找到父子关系');
-            return false;
-        }
-        
-        // 绘制简单的父子连接（单个父节点）
-        function drawSimpleParentChildConnection(svg, parentNode, children, containerRect) {
-            console.log('=== 绘制简单父子连接 ===');
-            console.log('父节点:', parentNode.querySelector('.node-name').textContent);
-            console.log('子节点数量:', children.length);
-            console.log('子节点:', children.map(c => c.querySelector('.node-name').textContent));
-            
-            const parentRect = parentNode.getBoundingClientRect();
-            const parentX = parentRect.left + parentRect.width / 2 - containerRect.left;
-            const parentY = parentRect.bottom - containerRect.top;
-            
-            console.log('父节点坐标:', {x: parentX, y: parentY});
-            
-            if (children.length === 1) {
-                console.log('绘制单个子节点连接');
-                // 单个子节点，直接连接
-                const childRect = children[0].getBoundingClientRect();
-                const childX = childRect.left + childRect.width / 2 - containerRect.left;
-                const childY = childRect.top - containerRect.top;
-                
-                console.log('子节点坐标:', {x: childX, y: childY});
-                
-                const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                const midY = parentY + (childY - parentY) / 2;
-                const path = `M ${parentX} ${parentY} L ${parentX} ${midY} L ${childX} ${midY} L ${childX} ${childY}`;
-                
-                console.log('连接线路径:', path);
-                
-                line.setAttribute('d', path);
-                line.setAttribute('class', 'connection-line parent-child');
-                svg.appendChild(line);
-                
-                console.log('连接线已添加到SVG');
-            } else {
-                console.log('绘制多个子节点T型连接');
-                // 多个子节点，使用T型连接
-                const childPositions = children.map(child => {
-                    const rect = child.getBoundingClientRect();
-                    return {
-                        x: rect.left + rect.width / 2 - containerRect.left,
-                        y: rect.top - containerRect.top
-                    };
-                });
-                
-                console.log('子节点位置:', childPositions);
-                
-                // 找到子节点的X坐标范围
-                const minChildX = Math.min(...childPositions.map(pos => pos.x));
-                const maxChildX = Math.max(...childPositions.map(pos => pos.x));
-                const childY = childPositions[0].y; // 假设所有子节点在同一水平线
-                
-                const midY = parentY + (childY - parentY) / 2;
-                
-                console.log('T型连接参数:', {minChildX, maxChildX, childY, midY});
-                
-                // 绘制从父节点到水平线的垂直线
-                const verticalLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                verticalLine.setAttribute('x1', parentX);
-                verticalLine.setAttribute('y1', parentY);
-                verticalLine.setAttribute('x2', parentX);
-                verticalLine.setAttribute('y2', midY);
-                verticalLine.setAttribute('class', 'connection-line parent-child');
-                svg.appendChild(verticalLine);
-                
-                // 绘制水平连接线 - 修复：应该从父节点X坐标开始，到最远子节点结束
-                const horizontalLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                const horizontalStartX = Math.min(parentX, minChildX);
-                const horizontalEndX = Math.max(parentX, maxChildX);
-                horizontalLine.setAttribute('x1', horizontalStartX);
-                horizontalLine.setAttribute('y1', midY);
-                horizontalLine.setAttribute('x2', horizontalEndX);
-                horizontalLine.setAttribute('y2', midY);
-                horizontalLine.setAttribute('class', 'connection-line parent-child');
-                svg.appendChild(horizontalLine);
-                
-                console.log('修复后的水平线坐标:', {x1: horizontalStartX, x2: horizontalEndX, y: midY});
-                
-                // 绘制从水平线到每个子节点的垂直线
-                childPositions.forEach(pos => {
-                    const childVerticalLine = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    childVerticalLine.setAttribute('x1', pos.x);
-                    childVerticalLine.setAttribute('y1', midY);
-                    childVerticalLine.setAttribute('x2', pos.x);
-                    childVerticalLine.setAttribute('y2', pos.y);
-                    childVerticalLine.setAttribute('class', 'connection-line parent-child');
-                    svg.appendChild(childVerticalLine);
-                });
-                
-                console.log('T型连接线已添加到SVG');
-            }
-        }
-        
-        // 绘制多父节点的子连接（避免相交）
-        function drawMultiParentChildConnections(svg, parentChildMap, containerRect) {
-            const parentEntries = Array.from(parentChildMap.entries());
-            const baseOffset = 20; // 基础偏移量
-            
-            parentEntries.forEach(([parentNode, children], index) => {
-                const parentRect = parentNode.getBoundingClientRect();
-                const parentX = parentRect.left + parentRect.width / 2 - containerRect.left;
-                const parentY = parentRect.bottom - containerRect.top;
-                
-                // 为每个父节点使用不同的中间Y坐标，避免相交
-                const offsetY = baseOffset + (index * 15);
-                
-                children.forEach(child => {
-                    const childRect = child.getBoundingClientRect();
-                    const childX = childRect.left + childRect.width / 2 - containerRect.left;
-                    const childY = childRect.top - containerRect.top;
-                    
-                    const midY = parentY + offsetY;
-                    
-                    // 绘制L型连接线
-                    const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-                    const pathData = `M ${parentX} ${parentY} L ${parentX} ${midY} L ${childX} ${midY} L ${childX} ${childY}`;
-                    
-                    path.setAttribute('d', pathData);
-                    path.setAttribute('class', 'connection-line parent-child');
-                    path.setAttribute('stroke-dasharray', index > 0 ? '3,3' : 'none'); // 非第一个父节点使用虚线
-                    svg.appendChild(path);
-                });
-            });
-        }
-
-        // 绘制配偶连接线
-        function drawSpouseConnections(svg, levelElement, container) {
-            const nodes = levelElement.querySelectorAll('.tree-node');
-            const containerRect = container.getBoundingClientRect();
-            
-            for (let i = 0; i < nodes.length - 1; i++) {
-                const node1 = nodes[i];
-                const node2 = nodes[i + 1];
-                
-                // 检查是否是配偶关系（通过marriage-connector判断）
-                const connector = node1.nextElementSibling;
-                if (connector && connector.classList.contains('marriage-connector')) {
-                    const rect1 = node1.getBoundingClientRect();
-                    const rect2 = node2.getBoundingClientRect();
-                    
-                    const x1 = rect1.right - containerRect.left;
-                    const y1 = rect1.top + rect1.height / 2 - containerRect.top;
-                    const x2 = rect2.left - containerRect.left;
-                    const y2 = rect2.top + rect2.height / 2 - containerRect.top;
-                    
-                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-                    line.setAttribute('x1', x1);
-                    line.setAttribute('y1', y1);
-                    line.setAttribute('x2', x2);
-                    line.setAttribute('y2', y2);
-                    line.setAttribute('class', 'connection-line spouse');
-                    svg.appendChild(line);
-                }
-            }
-        }
 
         // 渲染树节点
         function renderTreeNode(individual, nodeClass, label, compact = false) {
@@ -3495,53 +3269,7 @@
             return colors[index % colors.length];
         }
 
-        // 修复版本的父子关系检查函数（覆盖原函数）
-        function isParentChild(parentId, childId, treeStructure) {
-            // 测试函数是否被调用 - 检查任何父子关系
-            console.log('=== 检查父子关系 (修复版) ===');
-            console.log('父ID:', parentId, '子ID:', childId);
-            
-            // 遍历树结构，查找父子关系
-            for (let level = 0; level < treeStructure.levels.length - 1; level++) {
-                const currentLevelMembers = treeStructure.levels[level].members;
-                const nextLevelMembers = treeStructure.levels[level + 1].members;
-                
-                console.log(`检查层级 ${level} -> ${level + 1}`);
-                console.log('当前层成员:', currentLevelMembers.map(m => ({id: m.individual.individual_id, name: m.individual.full_name, isSpouse: m.isSpouse})));
-                console.log('下一层成员:', nextLevelMembers.map(m => ({id: m.individual.individual_id, name: m.individual.full_name, isSpouse: m.isSpouse})));
-                
-                // 检查父节点是否在当前层（包括配偶，因为配偶也可能是父母）
-                const parentMember = currentLevelMembers.find(m => 
-                    m.individual.individual_id === parentId
-                );
-                
-                if (parentMember) {
-                    console.log('找到父节点:', parentMember.individual.full_name);
-                    
-                    // 检查子节点是否在下一层
-                    const childMember = nextLevelMembers.find(m => 
-                        !m.isSpouse && m.individual.individual_id === childId
-                    );
-                    
-                    if (childMember) {
-                        console.log('找到子节点:', childMember.individual.full_name);
-                        console.log('子节点的父亲ID:', childMember.individual.father_id);
-                        console.log('子节点的母亲ID:', childMember.individual.mother_id);
-                        
-                        // 检查实际的父子关系
-                        const isParent = (childMember.individual.father_id === parentId || 
-                                         childMember.individual.mother_id === parentId);
-                        console.log('是否为父子关系:', isParent);
-                        
-                        if (isParent) {
-                            return true;
-                        }
-                    }
-                }
-            }
-            console.log('未找到父子关系');
-            return false;
-        }
+
     </script>
 </body>
 </html> 
