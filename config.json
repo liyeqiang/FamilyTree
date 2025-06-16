@@ -1,0 +1,38 @@
+{
+  "mode": "sqlite",
+  "port": "8081",
+  "db_path": "familytree.db",
+  "redis_enabled": true,
+  "worker_count": 10,
+  "cache_enabled": true,
+  "log_level": "info",
+  "database": {
+    "max_open_conns": 25,
+    "max_idle_conns": 10,
+    "conn_max_lifetime": "1h",
+    "conn_max_idle_time": "30m"
+  },
+  "redis": {
+    "host": "localhost",
+    "port": 6379,
+    "password": "",
+    "db": 0,
+    "pool_size": 10
+  },
+  "server": {
+    "read_timeout": "15s",
+    "write_timeout": "15s",
+    "idle_timeout": "60s"
+  },
+  "middleware": {
+    "enable_cors": true,
+    "enable_logging": true,
+    "enable_recovery": true,
+    "enable_metrics": true,
+    "enable_rate_limit": true,
+    "rate_limit": {
+      "requests_per_minute": 100,
+      "burst": 10
+    }
+  }
+} 

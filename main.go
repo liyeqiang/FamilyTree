@@ -40,7 +40,7 @@ type AppConfig struct {
 // DefaultAppConfig 默认应用配置
 func DefaultAppConfig() *AppConfig {
 	return &AppConfig{
-		Mode:         "demo",
+		Mode:         "sqlite",
 		Port:         "8080",
 		DBPath:       "familytree.db",
 		RedisEnabled: false,
