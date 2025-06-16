@@ -1,5 +1,4 @@
 {
-  "mode": "sqlite",
   "port": "8081",
   "db_path": "familytree.db",
   "redis_enabled": true,

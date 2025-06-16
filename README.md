@@ -26,7 +26,7 @@
 #### 1. 演示模式（推荐）
 无需数据库配置，数据存储在内存中，适合演示和测试：
 ```bash
-go run main.go demo
+go run main.go sqlite
 # 或者
 go run main.go
 ```

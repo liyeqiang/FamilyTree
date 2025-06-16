@@ -2,10 +2,10 @@ package handlers
 
 import (
 	"encoding/json"
-	"net/http"
-	"strconv"
 	"familytree/interfaces"
 	"familytree/models"
+	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 )
@@ -128,4 +128,167 @@ func (h *FamilyHandler) GetFamiliesByHusband(w http.ResponseWriter, r *http.Requ
 		Data:    husbandFamilies,
 		Message: "获取家庭关系成功",
 	})
-} 
+}
+
+// GetFamily 获取家庭关系
+func (h *FamilyHandler) GetFamily(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的家庭ID",
+		})
+		return
+	}
+
+	family, err := h.service.GetByID(r.Context(), id)
+	if err != nil {
+		respondJSON(w, http.StatusNotFound, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    family,
+	})
+}
+
+// UpdateFamily 更新家庭关系
+func (h *FamilyHandler) UpdateFamily(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的家庭ID",
+		})
+		return
+	}
+
+	var req models.CreateFamilyRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的请求数据",
+		})
+		return
+	}
+
+	family, err := h.service.Update(r.Context(), id, &req)
+	if err != nil {
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Data:    family,
+		Message: "更新成功",
+	})
+}
+
+// DeleteFamily 删除家庭关系
+func (h *FamilyHandler) DeleteFamily(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	id, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的家庭ID",
+		})
+		return
+	}
+
+	if err := h.service.Delete(r.Context(), id); err != nil {
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: "删除成功",
+	})
+}
+
+// AddChild 为家庭添加子女
+func (h *FamilyHandler) AddChild(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	familyID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的家庭ID",
+		})
+		return
+	}
+
+	var req struct {
+		ChildID      int    `json:"child_id"`
+		Relationship string `json:"relationship"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的请求数据",
+		})
+		return
+	}
+
+	if err := h.service.AddChild(r.Context(), familyID, req.ChildID, req.Relationship); err != nil {
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusCreated, APIResponse{
+		Success: true,
+		Message: "子女添加成功",
+	})
+}
+
+// RemoveChild 从家庭移除子女
+func (h *FamilyHandler) RemoveChild(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	familyID, err := strconv.Atoi(vars["id"])
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的家庭ID",
+		})
+		return
+	}
+
+	childID, err := strconv.Atoi(vars["childId"])
+	if err != nil {
+		respondJSON(w, http.StatusBadRequest, APIResponse{
+			Success: false,
+			Message: "无效的子女ID",
+		})
+		return
+	}
+
+	if err := h.service.RemoveChild(r.Context(), familyID, childID); err != nil {
+		respondJSON(w, http.StatusInternalServerError, APIResponse{
+			Success: false,
+			Message: err.Error(),
+		})
+		return
+	}
+
+	respondJSON(w, http.StatusOK, APIResponse{
+		Success: true,
+		Message: "子女移除成功",
+	})
+}

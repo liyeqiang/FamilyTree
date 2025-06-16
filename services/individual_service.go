@@ -355,14 +355,20 @@ func (s *IndividualService) Update(ctx context.Context, id int, req *models.Upda
 
 // validateNoCircularRelationship 验证不存在循环关系
 func (s *IndividualService) validateNoCircularRelationship(ctx context.Context, childID, parentID int, parentType string) error {
+	// 使用广度优先搜索检测循环
 	visited := make(map[int]bool)
+	queue := []int{parentID}
 
-	var checkAncestors func(int) error
-	checkAncestors = func(currentID int) error {
+	for len(queue) > 0 {
+		currentID := queue[0]
+		queue = queue[1:]
+
+		// 如果已访问过，跳过
 		if visited[currentID] {
-			return fmt.Errorf("检测到循环关系：不能将此人设为%s，因为会形成循环父母关系", parentType)
+			continue
 		}
 
+		// 如果找到了子女ID，说明存在循环
 		if currentID == childID {
 			return fmt.Errorf("检测到循环关系：不能将此人设为%s，因为会形成循环父母关系", parentType)
 		}
@@ -372,27 +378,19 @@ func (s *IndividualService) validateNoCircularRelationship(ctx context.Context, 
 		// 获取当前人的父母
 		individual, err := s.repo.GetIndividualByID(ctx, currentID)
 		if err != nil {
-			return nil // 如果获取失败，忽略（可能是数据不存在）
+			continue // 如果获取失败，忽略（可能是数据不存在）
 		}
 
-		// 递归检查父亲
-		if individual.FatherID != nil {
-			if err := checkAncestors(*individual.FatherID); err != nil {
-				return err
-			}
+		// 将父母加入队列继续检查
+		if individual.FatherID != nil && !visited[*individual.FatherID] {
+			queue = append(queue, *individual.FatherID)
 		}
-
-		// 递归检查母亲
-		if individual.MotherID != nil {
-			if err := checkAncestors(*individual.MotherID); err != nil {
-				return err
-			}
+		if individual.MotherID != nil && !visited[*individual.MotherID] {
+			queue = append(queue, *individual.MotherID)
 		}
-
-		return nil
 	}
 
-	return checkAncestors(parentID)
+	return nil
 }
 
 // 辅助函数：获取字符串指针的值或默认值
