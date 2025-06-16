@@ -1,17 +1,19 @@
 {
-  "port": "8081",
-  "db_path": "familytree.db",
-  "redis_enabled": true,
-  "worker_count": 10,
-  "cache_enabled": true,
+  "port": "8080",
+  "environment": "development",
   "log_level": "info",
+  "cache_enabled": true,
+  "redis_enabled": true,
   "database": {
+    "type": "sqlite",
+    "path": "familytree.db",
     "max_open_conns": 25,
     "max_idle_conns": 10,
-    "conn_max_lifetime": "1h",
-    "conn_max_idle_time": "30m"
+    "conn_max_lifetime": 3600,
+    "conn_max_idle_time": 1800
   },
   "redis": {
+    "enabled": true,
     "host": "localhost",
     "port": 6379,
     "password": "",
@@ -19,9 +21,14 @@
     "pool_size": 10
   },
   "server": {
-    "read_timeout": "15s",
-    "write_timeout": "15s",
-    "idle_timeout": "60s"
+    "read_timeout": 15,
+    "write_timeout": 15,
+    "idle_timeout": 60,
+    "enable_cors": true
+  },
+  "worker_pool": {
+    "enabled": true,
+    "worker_count": 10
   },
   "middleware": {
     "enable_cors": true,

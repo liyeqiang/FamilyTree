@@ -15,6 +15,10 @@ type Config struct {
 	Environment string `json:"environment"`
 	LogLevel    string `json:"log_level"`
 
+	// 功能开关
+	CacheEnabled bool `json:"cache_enabled"`
+	RedisEnabled bool `json:"redis_enabled"`
+
 	// 数据库配置
 	Database DatabaseConfig `json:"database"`
 
@@ -26,6 +30,9 @@ type Config struct {
 
 	// 工作池配置
 	WorkerPool WorkerPoolConfig `json:"worker_pool"`
+
+	// 中间件配置
+	Middleware MiddlewareConfig `json:"middleware"`
 }
 
 // DatabaseConfig 数据库配置
@@ -34,7 +41,8 @@ type DatabaseConfig struct {
 	Path            string `json:"path"`
 	MaxOpenConns    int    `json:"max_open_conns"`
 	MaxIdleConns    int    `json:"max_idle_conns"`
-	ConnMaxLifetime int    `json:"conn_max_lifetime"` // 秒
+	ConnMaxLifetime int    `json:"conn_max_lifetime"`  // 秒
+	ConnMaxIdleTime int    `json:"conn_max_idle_time"` // 秒
 }
 
 // RedisConfig Redis配置
@@ -61,18 +69,37 @@ type WorkerPoolConfig struct {
 	WorkerCount int  `json:"worker_count"`
 }
 
+// MiddlewareConfig 中间件配置
+type MiddlewareConfig struct {
+	EnableCORS      bool            `json:"enable_cors"`
+	EnableLogging   bool            `json:"enable_logging"`
+	EnableRecovery  bool            `json:"enable_recovery"`
+	EnableMetrics   bool            `json:"enable_metrics"`
+	EnableRateLimit bool            `json:"enable_rate_limit"`
+	RateLimit       RateLimitConfig `json:"rate_limit"`
+}
+
+// RateLimitConfig 限流配置
+type RateLimitConfig struct {
+	RequestsPerMinute int `json:"requests_per_minute"`
+	Burst             int `json:"burst"`
+}
+
 // DefaultConfig 返回默认配置
 func DefaultConfig() *Config {
 	return &Config{
-		Port:        "8080",
-		Environment: "development",
-		LogLevel:    "info",
+		Port:         "8080",
+		Environment:  "development",
+		LogLevel:     "info",
+		CacheEnabled: false,
+		RedisEnabled: false,
 		Database: DatabaseConfig{
 			Type:            "sqlite",
 			Path:            "familytree.db",
 			MaxOpenConns:    25,
 			MaxIdleConns:    10,
 			ConnMaxLifetime: 3600, // 1小时
+			ConnMaxIdleTime: 1800, // 30分钟
 		},
 		Redis: RedisConfig{
 			Enabled:  false,
@@ -91,6 +118,17 @@ func DefaultConfig() *Config {
 		WorkerPool: WorkerPoolConfig{
 			Enabled:     true,
 			WorkerCount: 10,
+		},
+		Middleware: MiddlewareConfig{
+			EnableCORS:      true,
+			EnableLogging:   true,
+			EnableRecovery:  true,
+			EnableMetrics:   true,
+			EnableRateLimit: true,
+			RateLimit: RateLimitConfig{
+				RequestsPerMinute: 60,
+				Burst:             10,
+			},
 		},
 	}
 }
