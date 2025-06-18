@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{.PageTitle}} - API文档</title>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 40px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .endpoint { background: #f5f5f5; padding: 10px; margin: 5px 0; border-radius: 5px; }
+        .endpoint a { text-decoration: none; color: #0066cc; }
+        .endpoint a:hover { text-decoration: underline; }
+        .info { background: #e8f4fd; padding: 15px; border-radius: 8px; border-left: 4px solid #0066cc; margin: 20px 0; }
+        .mode-switch { background: #fff3cd; padding: 15px; border-radius: 8px; border-left: 4px solid #ffa500; margin: 20px 0; }
+        .ui-link { background: #28a745; color: white; padding: 15px 30px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 20px 0; font-weight: bold; }
+        .ui-link:hover { background: #218838; color: white; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🌳 {{.PageTitle}} - API文档</h1>
+        
+        <a href="/ui" class="ui-link">🖥️ 打开管理界面</a>
+        
+        <div class="info">
+            <strong>模式:</strong> SQLite数据库版<br>
+            <strong>数据库:</strong> {{.DatabasePath}}<br>
+            <strong>状态:</strong> 运行中<br>
+            <strong>特性:</strong> 数据持久化存储
+        </div>
+
+        <div class="mode-switch">
+            <strong>💡 启动方式:</strong><br>
+            • 直接启动: <code>go run main.go</code>
+        </div>
+
+        <h2>🔗 API 端点</h2>
+        <div class="endpoint"><strong>GET</strong> <a href="/api/v1/individuals">/api/v1/individuals</a> - 获取所有个人信息</div>
+        <div class="endpoint"><strong>POST</strong> /api/v1/individuals - 创建个人信息</div>
+        <div class="endpoint"><strong>GET</strong> <a href="/api/v1/individuals/1">/api/v1/individuals/1</a> - 获取ID为1的个人信息</div>
+        <div class="endpoint"><strong>PUT</strong> /api/v1/individuals/{id} - 更新个人信息</div>
+        <div class="endpoint"><strong>DELETE</strong> /api/v1/individuals/{id} - 删除个人信息</div>
+
+        <h3>关系查询</h3>
+        <div class="endpoint"><strong>GET</strong> <a href="/api/v1/individuals/1/children">/api/v1/individuals/1/children</a> - 获取子女</div>
+        <div class="endpoint"><strong>GET</strong> <a href="/api/v1/individuals/3/parents">/api/v1/individuals/3/parents</a> - 获取父母</div>
+        <div class="endpoint"><strong>GET</strong> <a href="/api/v1/individuals/3/siblings">/api/v1/individuals/3/siblings</a> - 获取兄弟姐妹</div>
+        <div class="endpoint"><strong>GET</strong> <a href="/api/v1/individuals/1/ancestors">/api/v1/individuals/1/ancestors</a> - 获取祖先</div>
+        <div class="endpoint"><strong>GET</strong> <a href="/api/v1/individuals/1/descendants">/api/v1/individuals/1/descendants</a> - 获取后代</div>
+        <div class="endpoint"><strong>GET</strong> <a href="/api/v1/individuals/1/family-tree">/api/v1/individuals/1/family-tree</a> - 获取家族树</div>
+
+        <h3>其他</h3>
+        <div class="endpoint"><strong>GET</strong> <a href="/health">/health</a> - 健康检查</div>
+
+        <h2>📊 示例数据</h2>
+        <ul>
+            <li><strong>张老爷子</strong> (ID: 1) - 农民，1920年出生</li>
+            <li><strong>李老太太</strong> (ID: 2) - 家庭主妇，1925年出生</li>
+            <li><strong>张伟</strong> (ID: 3) - 工程师，1950年出生，张老爷子和李老太太的儿子</li>
+            <li><strong>王丽</strong> (ID: 4) - 教师，1955年出生</li>
+            <li><strong>张明</strong> (ID: 5) - 医生，1975年出生，张伟和王丽的儿子</li>
+            <li><strong>李美</strong> (ID: 6) - 护士，1978年出生</li>
+        </ul>
+
+        <h2>💡 特性说明</h2>
+        <ul>
+            <li>所有数据持久化存储在SQLite数据库中</li>
+            <li>支持完整的CRUD操作和事务</li>
+            <li>数据在重启后保持</li>
+            <li>支持复杂的家族关系查询</li>
+            <li>API返回JSON格式数据</li>
+            <li>使用 <code>?limit=10&offset=0</code> 进行分页查询</li>
+            <li>支持按姓名、职业、备注搜索</li>
+        </ul>
+    </div>
+</body>
+</html> 
