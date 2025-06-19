@@ -56,10 +56,10 @@ func (p *IndividualPool) Put(x *models.Individual) {
 	x.FullName = ""
 	x.Gender = ""
 	x.BirthDate = nil
-	x.BirthPlace = ""
+	x.BirthPlace = nil
 	x.BirthPlaceID = nil
 	x.DeathDate = nil
-	x.DeathPlace = ""
+	x.DeathPlace = nil
 	x.DeathPlaceID = nil
 	x.Occupation = ""
 	x.Notes = ""

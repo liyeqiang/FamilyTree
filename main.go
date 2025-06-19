@@ -18,7 +18,9 @@ import (
 
 	"familytree/config"
 	"familytree/handlers"
+	"familytree/interfaces"
 	"familytree/pkg/di"
+	"familytree/pkg/middleware"
 	"familytree/pkg/workerpool"
 	"familytree/repository"
 	"familytree/services"
@@ -89,9 +91,12 @@ func main() {
 
 // App 应用实例
 type App struct {
-	router  *mux.Router
-	db      *sql.DB
-	cleanup func()
+	router     *mux.Router
+	db         *sql.DB
+	cache      *repository.CacheRepository
+	workerPool *workerpool.Pool
+	container  *di.Container
+	cleanup    func()
 }
 
 // createApp 创建应用实例
@@ -99,84 +104,185 @@ func createApp(cfg *config.Config) (*App, error) {
 	var cleanupFuncs []func()
 
 	cleanup := func() {
+		log.Println("正在清理资源...")
 		for _, fn := range cleanupFuncs {
 			fn()
 		}
+		log.Println("资源清理完成")
 	}
 
 	// 创建依赖注入容器
 	container := di.NewContainer()
+	log.Println("✅ 依赖注入容器已创建")
 
 	// 创建工作池
 	var workerPool *workerpool.Pool
 	if cfg.WorkerPool.Enabled && cfg.WorkerPool.WorkerCount > 0 {
 		workerPool = workerpool.NewPool(cfg.WorkerPool.WorkerCount)
 		cleanupFuncs = append(cleanupFuncs, func() {
+			log.Println("正在停止工作池...")
 			workerPool.Stop()
+			log.Println("✅ 工作池已停止")
 		})
+		log.Printf("✅ 工作池已创建 (工作者数量: %d)", cfg.WorkerPool.WorkerCount)
 	}
 
-	// 直接创建SQLite应用，不再需要模式检查
-	return createSQLiteApp(cfg, container, cleanup)
+	// 直接创建SQLite应用，集成所有模块
+	return createSQLiteApp(cfg, container, workerPool, cleanup)
 }
 
 // createSQLiteApp 创建SQLite模式应用
-func createSQLiteApp(cfg *config.Config, container *di.Container, cleanup func()) (*App, error) {
-	log.Println("创建SQLite数据库版应用...")
+func createSQLiteApp(cfg *config.Config, container *di.Container, workerPool *workerpool.Pool, cleanup func()) (*App, error) {
+	log.Println("🔧 创建SQLite数据库版应用...")
+
+	var cleanupFuncs []func()
+	cleanupFuncs = append(cleanupFuncs, cleanup)
 
 	// 创建SQLite存储库
 	repo, err := repository.NewSQLiteRepository(cfg.GetDatabaseDSN())
 	if err != nil {
 		return nil, fmt.Errorf("创建SQLite存储库失败: %v", err)
 	}
+	log.Println("✅ SQLite存储库已创建")
 
-	// 初始化数据库
+	// 注册存储库到容器
+	container.Register(repo)
+
+	// 初始化数据库连接池清理
 	if closer, ok := interface{}(repo).(interface{ Close() error }); ok {
-		cleanupFuncs := []func(){cleanup}
 		cleanupFuncs = append(cleanupFuncs, func() {
+			log.Println("正在关闭数据库连接...")
 			closer.Close()
+			log.Println("✅ 数据库连接已关闭")
 		})
-
-		newCleanup := func() {
-			for _, fn := range cleanupFuncs {
-				fn()
-			}
-		}
-		cleanup = newCleanup
 	}
 
-	// 创建服务
-	individualService := services.NewIndividualService(repo, repo)
-	familyService := services.NewFamilyService(repo, repo)
+	// 创建Redis缓存（如果启用）
+	var cacheRepo *repository.CacheRepository
+	if cfg.RedisEnabled && cfg.CacheEnabled {
+		log.Println("🔄 初始化Redis缓存...")
+		cache, err := repository.NewCacheRepository(&cfg.Redis, 10*time.Minute)
+		if err != nil {
+			log.Printf("⚠️  Redis缓存初始化失败: %v，继续使用无缓存模式", err)
+		} else {
+			cacheRepo = cache
+			cleanupFuncs = append(cleanupFuncs, func() {
+				log.Println("正在关闭Redis连接...")
+				cacheRepo.Close()
+				log.Println("✅ Redis连接已关闭")
+			})
+			container.Register(cacheRepo)
+			log.Println("✅ Redis缓存已启用")
+		}
+	}
+
+	// 创建服务层
+	baseIndividualService := services.NewIndividualService(repo, repo)
+	baseFamilyService := services.NewFamilyService(repo, repo)
+
+	// 如果有缓存，使用缓存装饰器
+	var individualService interfaces.IndividualService
+	if cacheRepo != nil {
+		individualService = services.NewCachedIndividualService(baseIndividualService, cacheRepo)
+		log.Println("✅ 个人信息服务（带缓存）已创建")
+	} else {
+		individualService = baseIndividualService
+		log.Println("✅ 个人信息服务已创建")
+	}
+
+	// 注册服务到容器
+	container.Register(individualService)
+	container.Register(baseFamilyService)
 
 	// 创建处理器
 	individualHandler := handlers.NewIndividualHandler(individualService)
-	familyHandler := handlers.NewFamilyHandler(familyService)
+	familyHandler := handlers.NewFamilyHandler(baseFamilyService)
+	log.Println("✅ HTTP处理器已创建")
 
-	// 设置路由
-	router := setupRouter(individualHandler, familyHandler, cfg)
+	// 注册处理器到容器
+	container.Register(individualHandler)
+	container.Register(familyHandler)
+
+	// 设置路由（集成高级中间件）
+	router := setupAdvancedRouter(individualHandler, familyHandler, cfg)
+	log.Println("✅ 高级路由和中间件已配置")
+
+	// 构建最终的清理函数
+	finalCleanup := func() {
+		for _, fn := range cleanupFuncs {
+			fn()
+		}
+	}
 
 	return &App{
-		router:  router,
-		cleanup: cleanup,
+		router:     router,
+		cache:      cacheRepo,
+		workerPool: workerPool,
+		container:  container,
+		cleanup:    finalCleanup,
 	}, nil
 }
 
-// setupRouter 设置路由
-func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *handlers.FamilyHandler, cfg *config.Config) *mux.Router {
+// setupAdvancedRouter 设置带高级中间件的路由
+func setupAdvancedRouter(individualHandler *handlers.IndividualHandler, familyHandler *handlers.FamilyHandler, cfg *config.Config) *mux.Router {
 	router := mux.NewRouter()
 
-	// 添加中间件
-	if cfg.Server.EnableCORS {
-		router.Use(corsMiddleware)
+	// 添加中间件（使用Gorilla mux兼容的方式）
+
+	// 1. 恢复中间件（最外层）
+	if cfg.Middleware.EnableRecovery {
+		router.Use(func(next http.Handler) http.Handler {
+			return middleware.Recover(next)
+		})
+		log.Println("✅ 恢复中间件已启用")
 	}
 
-	if cfg.IsDevelopment() {
-		router.Use(loggingMiddleware)
+	// 2. 日志中间件
+	if cfg.Middleware.EnableLogging {
+		router.Use(func(next http.Handler) http.Handler {
+			return middleware.Logger(next)
+		})
+		log.Println("✅ 日志中间件已启用")
 	}
 
-	// API路由
+	// 3. CORS中间件
+	if cfg.Middleware.EnableCORS {
+		router.Use(func(next http.Handler) http.Handler {
+			return middleware.CORS(next)
+		})
+		log.Println("✅ CORS中间件已启用")
+	}
+
+	// 4. 限流中间件
+	if cfg.Middleware.EnableRateLimit {
+		rateLimitMiddleware := middleware.RateLimit(
+			cfg.Middleware.RateLimit.RequestsPerMinute,
+			time.Minute,
+		)
+		router.Use(func(next http.Handler) http.Handler {
+			return rateLimitMiddleware(next)
+		})
+		log.Printf("✅ 限流中间件已启用 (每分钟%d次请求)", cfg.Middleware.RateLimit.RequestsPerMinute)
+	}
+
+	// 5. 指标中间件
+	var metricsCollector *middleware.Metrics
+	if cfg.Middleware.EnableMetrics {
+		metricsCollector = middleware.NewMetrics()
+		router.Use(func(next http.Handler) http.Handler {
+			return metricsCollector.MetricsMiddleware(next)
+		})
+		log.Println("✅ 指标中间件已启用")
+	}
+
+	// API路由（带超时中间件）
 	api := router.PathPrefix("/api/v1").Subrouter()
+
+	// 超时中间件（针对API路由）
+	timeoutMiddleware := middleware.Timeout(30 * time.Second)
+	api.Use(func(next http.Handler) http.Handler {
+		return timeoutMiddleware(next)
+	})
 
 	// 个人信息路由
 	individuals := api.PathPrefix("/individuals").Subrouter()
@@ -211,16 +317,47 @@ func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *h
 	families.HandleFunc("/{id:[0-9]+}/children/{childId:[0-9]+}", familyHandler.RemoveChild).Methods("DELETE")
 	families.HandleFunc("/husband/{id:[0-9]+}", familyHandler.GetFamiliesByHusband).Methods("GET")
 
-	// 健康检查
+	// 健康检查（带缓存检查）
 	router.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		response := map[string]string{
+		response := map[string]interface{}{
 			"status":   "ok",
 			"message":  "家谱系统SQLite版运行中",
 			"database": cfg.Database.Path,
+			"features": map[string]bool{
+				"redis_cache":   cfg.RedisEnabled && cfg.CacheEnabled,
+				"worker_pool":   cfg.WorkerPool.Enabled,
+				"rate_limiting": cfg.Middleware.EnableRateLimit,
+				"metrics":       cfg.Middleware.EnableMetrics,
+			},
+			"timestamp": time.Now(),
 		}
 		json.NewEncoder(w).Encode(response)
 	}).Methods("GET")
+
+	// 指标查看API（如果启用了指标）
+	if cfg.Middleware.EnableMetrics && metricsCollector != nil {
+		api.HandleFunc("/metrics", metricsCollector.MetricsHandler).Methods("GET")
+		log.Println("✅ 指标查看API已启用 (/api/v1/metrics)")
+	}
+
+	// 缓存管理API（如果启用了缓存）
+	if cfg.RedisEnabled && cfg.CacheEnabled {
+		cache := router.PathPrefix("/api/v1/cache").Subrouter()
+		cache.Use(func(next http.Handler) http.Handler {
+			return timeoutMiddleware(next)
+		})
+
+		// 清除所有缓存
+		cache.HandleFunc("/clear", func(w http.ResponseWriter, r *http.Request) {
+			// TODO: 实现缓存清除逻辑
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusOK)
+			json.NewEncoder(w).Encode(map[string]string{
+				"message": "缓存清除功能待实现",
+			})
+		}).Methods("DELETE")
+	}
 
 	// API文档页面 - 使用模板文件
 	router.HandleFunc("/docs", func(w http.ResponseWriter, r *http.Request) {
@@ -235,7 +372,7 @@ func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *h
 
 		// 准备模板数据
 		data := DocsPageData{
-			PageTitle:    "家谱系统 - SQLite版",
+			PageTitle:    "家谱系统 - SQLite版（完整功能）",
 			DatabasePath: cfg.Database.Path,
 		}
 
@@ -270,38 +407,6 @@ func setupRouter(individualHandler *handlers.IndividualHandler, familyHandler *h
 	}).Methods("GET")
 
 	return router
-}
-
-// corsMiddleware CORS中间件
-func corsMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Content-Length, Accept-Encoding, X-CSRF-Token, Authorization, accept, origin, Cache-Control, X-Requested-With")
-		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS, GET, PUT, DELETE")
-
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-
-		next.ServeHTTP(w, r)
-	})
-}
-
-// loggingMiddleware 日志中间件
-func loggingMiddleware(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		next.ServeHTTP(w, r)
-		log.Printf(
-			"%s %s %s %v",
-			r.Method,
-			r.RequestURI,
-			r.RemoteAddr,
-			time.Since(start),
-		)
-	})
 }
 
 // initializeDatabase 初始化数据库（创建表和示例数据）

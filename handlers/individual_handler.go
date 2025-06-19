@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"familytree/interfaces"
 	"familytree/models"
+	"familytree/pkg/errors"
 	"net/http"
 	"strconv"
 
@@ -25,6 +26,7 @@ type APIResponse struct {
 	Success bool        `json:"success"`
 	Data    interface{} `json:"data,omitempty"`
 	Message string      `json:"message,omitempty"`
+	Code    string      `json:"code,omitempty"`
 	Total   *int        `json:"total,omitempty"`
 	Limit   *int        `json:"limit,omitempty"`
 	Offset  *int        `json:"offset,omitempty"`
@@ -37,6 +39,25 @@ func respondJSON(w http.ResponseWriter, status int, response APIResponse) {
 	json.NewEncoder(w).Encode(response)
 }
 
+// handleError 统一错误处理
+func handleError(w http.ResponseWriter, err error) {
+	if appErr, ok := err.(*errors.AppError); ok {
+		respondJSON(w, appErr.HTTPStatus(), APIResponse{
+			Success: false,
+			Message: appErr.Message,
+			Code:    string(appErr.Code),
+		})
+		return
+	}
+
+	// 未知错误
+	respondJSON(w, http.StatusInternalServerError, APIResponse{
+		Success: false,
+		Message: "内部服务器错误",
+		Code:    string(errors.ErrCodeInternalError),
+	})
+}
+
 // CreateIndividual 创建个人信息
 func (h *IndividualHandler) CreateIndividual(w http.ResponseWriter, r *http.Request) {
 	var req models.CreateIndividualRequest
@@ -44,16 +65,14 @@ func (h *IndividualHandler) CreateIndividual(w http.ResponseWriter, r *http.Requ
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的请求数据",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
 
 	individual, err := h.service.Create(r.Context(), &req)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
@@ -72,16 +91,14 @@ func (h *IndividualHandler) GetIndividual(w http.ResponseWriter, r *http.Request
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的ID",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
 
 	individual, err := h.service.GetByID(r.Context(), id)
 	if err != nil {
-		respondJSON(w, http.StatusNotFound, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
@@ -99,6 +116,7 @@ func (h *IndividualHandler) UpdateIndividual(w http.ResponseWriter, r *http.Requ
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的ID",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
@@ -108,16 +126,14 @@ func (h *IndividualHandler) UpdateIndividual(w http.ResponseWriter, r *http.Requ
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的请求数据",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
 
 	individual, err := h.service.Update(r.Context(), id, &req)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
@@ -136,15 +152,13 @@ func (h *IndividualHandler) DeleteIndividual(w http.ResponseWriter, r *http.Requ
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的ID",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
 
 	if err := h.service.Delete(r.Context(), id); err != nil {
-		respondJSON(w, http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
@@ -181,10 +195,7 @@ func (h *IndividualHandler) SearchIndividuals(w http.ResponseWriter, r *http.Req
 
 	individuals, total, err := h.service.Search(r.Context(), query, limit, offset)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
@@ -205,16 +216,14 @@ func (h *IndividualHandler) GetChildren(w http.ResponseWriter, r *http.Request) 
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的ID",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
 
 	children, err := h.service.GetChildren(r.Context(), id)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
@@ -232,16 +241,14 @@ func (h *IndividualHandler) GetParents(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的ID",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
 
 	father, mother, err := h.service.GetParents(r.Context(), id)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
@@ -268,16 +275,14 @@ func (h *IndividualHandler) GetSiblings(w http.ResponseWriter, r *http.Request) 
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的ID",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
 
 	siblings, err := h.service.GetSiblings(r.Context(), id)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
@@ -295,16 +300,14 @@ func (h *IndividualHandler) GetSpouses(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的ID",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
 
 	spouses, err := h.service.GetSpouses(r.Context(), id)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
@@ -322,6 +325,7 @@ func (h *IndividualHandler) GetAncestors(w http.ResponseWriter, r *http.Request)
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的ID",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
@@ -336,10 +340,7 @@ func (h *IndividualHandler) GetAncestors(w http.ResponseWriter, r *http.Request)
 
 	ancestors, err := h.service.GetAncestors(r.Context(), id, generations)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
@@ -357,6 +358,7 @@ func (h *IndividualHandler) GetDescendants(w http.ResponseWriter, r *http.Reques
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的ID",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
@@ -371,10 +373,7 @@ func (h *IndividualHandler) GetDescendants(w http.ResponseWriter, r *http.Reques
 
 	descendants, err := h.service.GetDescendants(r.Context(), id, generations)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
@@ -392,6 +391,7 @@ func (h *IndividualHandler) GetFamilyTree(w http.ResponseWriter, r *http.Request
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的ID",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
@@ -406,10 +406,7 @@ func (h *IndividualHandler) GetFamilyTree(w http.ResponseWriter, r *http.Request
 
 	tree, err := h.service.GetFamilyTree(r.Context(), id, generations)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
@@ -427,6 +424,7 @@ func (h *IndividualHandler) AddParent(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "无效的子女ID",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
@@ -436,16 +434,14 @@ func (h *IndividualHandler) AddParent(w http.ResponseWriter, r *http.Request) {
 		respondJSON(w, http.StatusBadRequest, APIResponse{
 			Success: false,
 			Message: "请求数据格式错误",
+			Code:    string(errors.ErrCodeInvalidInput),
 		})
 		return
 	}
 
 	parent, err := h.service.AddParent(r.Context(), childID, &req)
 	if err != nil {
-		respondJSON(w, http.StatusInternalServerError, APIResponse{
-			Success: false,
-			Message: err.Error(),
-		})
+		handleError(w, err)
 		return
 	}
 
