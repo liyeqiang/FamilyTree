@@ -3,6 +3,8 @@ package models
 import (
 	"database/sql/driver"
 	"time"
+
+	"github.com/golang-jwt/jwt/v4"
 )
 
 // Gender 性别枚举
@@ -257,4 +259,74 @@ type PaginationResponse struct {
 	Total  int         `json:"total"`
 	Limit  int         `json:"limit"`
 	Offset int         `json:"offset"`
+}
+
+// User 用户信息结构体
+type User struct {
+	UserID    int       `json:"user_id" db:"user_id"`
+	Username  string    `json:"username" db:"username"`
+	Email     string    `json:"email" db:"email"`
+	Password  string    `json:"-" db:"password"` // 不在JSON中返回密码
+	FullName  string    `json:"full_name" db:"full_name"`
+	Avatar    *string   `json:"avatar,omitempty" db:"avatar"`
+	IsActive  bool      `json:"is_active" db:"is_active"`
+	CreatedAt time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// UserFamilyTree 用户家族树关联表
+type UserFamilyTree struct {
+	UserID         int       `json:"user_id" db:"user_id"`
+	FamilyTreeID   int       `json:"family_tree_id" db:"family_tree_id"`
+	FamilyTreeName string    `json:"family_tree_name" db:"family_tree_name"`
+	Description    string    `json:"description,omitempty" db:"description"`
+	RootPersonID   *int      `json:"root_person_id,omitempty" db:"root_person_id"`
+	IsDefault      bool      `json:"is_default" db:"is_default"`
+	CreatedAt      time.Time `json:"created_at" db:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at" db:"updated_at"`
+}
+
+// LoginRequest 登录请求结构体
+type LoginRequest struct {
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
+}
+
+// RegisterRequest 注册请求结构体
+type RegisterRequest struct {
+	Username string `json:"username" binding:"required"`
+	Email    string `json:"email" binding:"required"`
+	Password string `json:"password" binding:"required"`
+	FullName string `json:"full_name" binding:"required"`
+}
+
+// LoginResponse 登录响应结构体
+type LoginResponse struct {
+	User         *User  `json:"user"`
+	Token        string `json:"token"`
+	RefreshToken string `json:"refresh_token"`
+	ExpiresIn    int64  `json:"expires_in"`
+}
+
+// CreateFamilyTreeRequest 创建家族树请求
+type CreateFamilyTreeRequest struct {
+	FamilyTreeName string                   `json:"family_tree_name" binding:"required"`
+	Description    string                   `json:"description,omitempty"`
+	RootPersonName string                   `json:"root_person_name,omitempty"`
+	RootPersonInfo *CreateIndividualRequest `json:"root_person_info,omitempty"`
+}
+
+// JWTClaims JWT令牌声明
+type JWTClaims struct {
+	UserID   int    `json:"user_id"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	jwt.StandardClaims
+}
+
+// AuthContext 认证上下文
+type AuthContext struct {
+	UserID   int
+	Username string
+	Email    string
 }

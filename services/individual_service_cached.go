@@ -53,6 +53,27 @@ func (s *CachedIndividualService) Create(ctx context.Context, req *models.Create
 	return individual, nil
 }
 
+// CreateForUser 创建个人信息（用户隔离版本，创建后清除相关缓存）
+func (s *CachedIndividualService) CreateForUser(ctx context.Context, userID int, req *models.CreateIndividualRequest) (*models.Individual, error) {
+	// 验证输入
+	if req.FullName == "" {
+		return nil, errors.New(errors.ErrCodeInvalidInput, "姓名不能为空")
+	}
+
+	// 调用原服务
+	individual, err := s.service.CreateForUser(ctx, userID, req)
+	if err != nil {
+		return nil, err
+	}
+
+	// 异步清除相关缓存
+	go func() {
+		s.invalidateRelatedCache(context.Background(), individual.IndividualID)
+	}()
+
+	return individual, nil
+}
+
 // GetByID 获取个人信息（带缓存）
 func (s *CachedIndividualService) GetByID(ctx context.Context, id int) (*models.Individual, error) {
 	if id <= 0 {
@@ -129,6 +150,11 @@ func (s *CachedIndividualService) Delete(ctx context.Context, id int) error {
 // Search 搜索个人信息（不缓存搜索结果，因为变化太频繁）
 func (s *CachedIndividualService) Search(ctx context.Context, query string, limit, offset int) ([]models.Individual, int, error) {
 	return s.service.Search(ctx, query, limit, offset)
+}
+
+// SearchForUser 搜索个人信息（用户隔离版本，不缓存搜索结果，因为变化太频繁）
+func (s *CachedIndividualService) SearchForUser(ctx context.Context, userID int, query string, limit, offset int) ([]models.Individual, int, error) {
+	return s.service.SearchForUser(ctx, userID, query, limit, offset)
 }
 
 // GetChildren 获取子女（带缓存）

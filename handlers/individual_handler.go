@@ -5,6 +5,8 @@ import (
 	"familytree/interfaces"
 	"familytree/models"
 	"familytree/pkg/errors"
+	"familytree/pkg/middleware"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -60,6 +62,17 @@ func handleError(w http.ResponseWriter, err error) {
 
 // CreateIndividual 创建个人信息
 func (h *IndividualHandler) CreateIndividual(w http.ResponseWriter, r *http.Request) {
+	// 获取认证用户信息
+	user, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		respondJSON(w, http.StatusUnauthorized, APIResponse{
+			Success: false,
+			Message: "用户未认证",
+			Code:    string(errors.ErrCodeUnauthorized),
+		})
+		return
+	}
+
 	var req models.CreateIndividualRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondJSON(w, http.StatusBadRequest, APIResponse{
@@ -70,7 +83,7 @@ func (h *IndividualHandler) CreateIndividual(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	individual, err := h.service.Create(r.Context(), &req)
+	individual, err := h.service.CreateForUser(r.Context(), user.UserID, &req)
 	if err != nil {
 		handleError(w, err)
 		return
@@ -170,11 +183,27 @@ func (h *IndividualHandler) DeleteIndividual(w http.ResponseWriter, r *http.Requ
 
 // SearchIndividuals 搜索个人信息
 func (h *IndividualHandler) SearchIndividuals(w http.ResponseWriter, r *http.Request) {
+	// 获取认证用户信息
+	user, ok := middleware.GetUserFromContext(r.Context())
+	if !ok {
+		fmt.Printf("DEBUG: 用户未认证\n")
+		respondJSON(w, http.StatusUnauthorized, APIResponse{
+			Success: false,
+			Message: "用户未认证",
+			Code:    string(errors.ErrCodeUnauthorized),
+		})
+		return
+	}
+
+	fmt.Printf("DEBUG: 用户ID=%d, 用户名=%s\n", user.UserID, user.Username)
+
 	// 同时支持q和query参数
 	query := r.URL.Query().Get("query")
 	if query == "" {
 		query = r.URL.Query().Get("q")
 	}
+
+	fmt.Printf("DEBUG: 搜索查询='%s'\n", query)
 
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
@@ -193,11 +222,16 @@ func (h *IndividualHandler) SearchIndividuals(w http.ResponseWriter, r *http.Req
 		}
 	}
 
-	individuals, total, err := h.service.Search(r.Context(), query, limit, offset)
+	fmt.Printf("DEBUG: limit=%d, offset=%d\n", limit, offset)
+
+	individuals, total, err := h.service.SearchForUser(r.Context(), user.UserID, query, limit, offset)
 	if err != nil {
+		fmt.Printf("DEBUG: 服务错误: %v\n", err)
 		handleError(w, err)
 		return
 	}
+
+	fmt.Printf("DEBUG: 找到 %d 个个人信息，总数=%d\n", len(individuals), total)
 
 	respondJSON(w, http.StatusOK, APIResponse{
 		Success: true,

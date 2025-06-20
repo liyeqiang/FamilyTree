@@ -9,6 +9,8 @@ import (
 type IndividualService interface {
 	// 创建个人信息
 	Create(ctx context.Context, req *models.CreateIndividualRequest) (*models.Individual, error)
+	// 创建个人信息（用户隔离版本）
+	CreateForUser(ctx context.Context, userID int, req *models.CreateIndividualRequest) (*models.Individual, error)
 
 	// 根据ID获取个人信息
 	GetByID(ctx context.Context, id int) (*models.Individual, error)
@@ -21,6 +23,8 @@ type IndividualService interface {
 
 	// 搜索个人信息
 	Search(ctx context.Context, query string, limit, offset int) ([]models.Individual, int, error)
+	// 用户隔离版本
+	SearchForUser(ctx context.Context, userID int, query string, limit, offset int) ([]models.Individual, int, error)
 
 	// 获取个人的所有子女
 	GetChildren(ctx context.Context, id int) ([]models.Individual, error)
@@ -208,10 +212,12 @@ type Repository interface {
 // IndividualRepository 个人信息数据访问接口
 type IndividualRepository interface {
 	CreateIndividual(ctx context.Context, individual *models.Individual) (*models.Individual, error)
+	CreateIndividualForUser(ctx context.Context, userID int, individual *models.Individual) (*models.Individual, error)
 	GetIndividualByID(ctx context.Context, id int) (*models.Individual, error)
 	UpdateIndividual(ctx context.Context, id int, individual *models.Individual) (*models.Individual, error)
 	DeleteIndividual(ctx context.Context, id int) error
 	SearchIndividuals(ctx context.Context, query string, limit, offset int) ([]models.Individual, int, error)
+	SearchIndividualsForUser(ctx context.Context, userID int, query string, limit, offset int) ([]models.Individual, int, error)
 	GetIndividualsByParentID(ctx context.Context, parentID int) ([]models.Individual, error)
 	GetIndividualsByIDs(ctx context.Context, ids []int) ([]models.Individual, error)
 	GetSpouses(ctx context.Context, individualID int) ([]models.Individual, error)
@@ -280,4 +286,86 @@ type NoteRepository interface {
 	DeleteNote(ctx context.Context, id int) error
 	GetNotesByEntity(ctx context.Context, entityType models.EntityType, entityID int) ([]models.Note, error)
 	SearchNotes(ctx context.Context, query string, limit, offset int) ([]models.Note, int, error)
+}
+
+// AuthService 认证服务接口
+type AuthService interface {
+	// 用户注册
+	Register(ctx context.Context, req *models.RegisterRequest) (*models.User, error)
+
+	// 用户登录
+	Login(ctx context.Context, req *models.LoginRequest) (*models.LoginResponse, error)
+
+	// 刷新令牌
+	RefreshToken(ctx context.Context, refreshToken string) (*models.LoginResponse, error)
+
+	// 验证令牌
+	ValidateToken(ctx context.Context, token string) (*models.User, error)
+
+	// 生成JWT令牌
+	GenerateToken(user *models.User) (string, string, error)
+}
+
+// UserService 用户服务接口
+type UserService interface {
+	// 根据ID获取用户
+	GetByID(ctx context.Context, id int) (*models.User, error)
+
+	// 根据用户名获取用户
+	GetByUsername(ctx context.Context, username string) (*models.User, error)
+
+	// 根据邮箱获取用户
+	GetByEmail(ctx context.Context, email string) (*models.User, error)
+
+	// 更新用户信息
+	Update(ctx context.Context, id int, user *models.User) (*models.User, error)
+
+	// 删除用户
+	Delete(ctx context.Context, id int) error
+
+	// 修改密码
+	ChangePassword(ctx context.Context, userID int, oldPassword, newPassword string) error
+}
+
+// FamilyTreeService 家族树服务接口
+type FamilyTreeService interface {
+	// 创建家族树
+	CreateFamilyTree(ctx context.Context, userID int, req *models.CreateFamilyTreeRequest) (*models.UserFamilyTree, error)
+
+	// 获取用户的家族树列表
+	GetUserFamilyTrees(ctx context.Context, userID int) ([]models.UserFamilyTree, error)
+
+	// 获取默认家族树
+	GetDefaultFamilyTree(ctx context.Context, userID int) (*models.UserFamilyTree, error)
+
+	// 设置默认家族树
+	SetDefaultFamilyTree(ctx context.Context, userID int, familyTreeID int) error
+
+	// 删除家族树
+	DeleteFamilyTree(ctx context.Context, userID int, familyTreeID int) error
+
+	// 更新家族树信息
+	UpdateFamilyTree(ctx context.Context, userID int, familyTreeID int, req *models.CreateFamilyTreeRequest) (*models.UserFamilyTree, error)
+}
+
+// UserRepository 用户数据访问接口
+type UserRepository interface {
+	CreateUser(ctx context.Context, user *models.User) (*models.User, error)
+	GetUserByID(ctx context.Context, id int) (*models.User, error)
+	GetUserByUsername(ctx context.Context, username string) (*models.User, error)
+	GetUserByEmail(ctx context.Context, email string) (*models.User, error)
+	UpdateUser(ctx context.Context, id int, user *models.User) (*models.User, error)
+	DeleteUser(ctx context.Context, id int) error
+	UpdatePassword(ctx context.Context, userID int, hashedPassword string) error
+}
+
+// FamilyTreeRepository 家族树数据访问接口
+type FamilyTreeRepository interface {
+	CreateFamilyTree(ctx context.Context, familyTree *models.UserFamilyTree) (*models.UserFamilyTree, error)
+	GetFamilyTreeByID(ctx context.Context, id int) (*models.UserFamilyTree, error)
+	GetUserFamilyTrees(ctx context.Context, userID int) ([]models.UserFamilyTree, error)
+	UpdateFamilyTree(ctx context.Context, id int, familyTree *models.UserFamilyTree) (*models.UserFamilyTree, error)
+	DeleteFamilyTree(ctx context.Context, id int) error
+	SetDefaultFamilyTree(ctx context.Context, userID int, familyTreeID int) error
+	GetDefaultFamilyTree(ctx context.Context, userID int) (*models.UserFamilyTree, error)
 }

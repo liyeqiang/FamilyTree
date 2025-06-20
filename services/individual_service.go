@@ -160,6 +160,143 @@ func (s *IndividualService) Create(ctx context.Context, req *models.CreateIndivi
 	return createdIndividual, nil
 }
 
+// CreateForUser 创建个人信息（用户隔离版本）
+func (s *IndividualService) CreateForUser(ctx context.Context, userID int, req *models.CreateIndividualRequest) (*models.Individual, error) {
+	// 验证必填字段
+	if req.FullName == "" {
+		return nil, fmt.Errorf("姓名不能为空")
+	}
+
+	// 验证父母关系
+	if req.FatherID != nil && req.MotherID != nil && *req.FatherID == *req.MotherID {
+		return nil, fmt.Errorf("父亲和母亲不能是同一个人")
+	}
+
+	// 如果指定了父亲，验证父亲存在且为男性
+	if req.FatherID != nil {
+		father, err := s.repo.GetIndividualByID(ctx, *req.FatherID)
+		if err != nil {
+			return nil, fmt.Errorf("父亲不存在")
+		}
+		if father.Gender != models.GenderMale {
+			return nil, fmt.Errorf("指定的父亲必须是男性")
+		}
+
+		// 如果指定了母亲，验证母亲存在且为女性
+		if req.MotherID != nil {
+			mother, err := s.repo.GetIndividualByID(ctx, *req.MotherID)
+			if err != nil {
+				return nil, fmt.Errorf("母亲不存在")
+			}
+			if mother.Gender != models.GenderFemale {
+				return nil, fmt.Errorf("指定的母亲必须是女性")
+			}
+
+			// 验证父母是否已婚，如果没有则自动创建婚姻关系
+			families, err := s.familyRepo.GetFamiliesByIndividualID(ctx, *req.FatherID)
+			if err != nil {
+				return nil, fmt.Errorf("验证父母婚姻关系失败: %v", err)
+			}
+
+			married := false
+			for _, family := range families {
+				if family.HusbandID != nil && *family.HusbandID == *req.FatherID &&
+					family.WifeID != nil && *family.WifeID == *req.MotherID {
+					married = true
+					break
+				}
+			}
+
+			// 如果父母未建立婚姻关系，自动创建
+			if !married {
+				// 获取父亲的下一个婚姻顺序
+				marriageOrder := 1
+				for _, family := range families {
+					if family.HusbandID != nil && *family.HusbandID == *req.FatherID {
+						if family.MarriageOrder >= marriageOrder {
+							marriageOrder = family.MarriageOrder + 1
+						}
+					}
+				}
+
+				// 创建婚姻关系
+				newFamily := &models.Family{
+					HusbandID:     req.FatherID,
+					WifeID:        req.MotherID,
+					MarriageOrder: marriageOrder,
+					Notes:         "系统自动创建的婚姻关系",
+				}
+
+				_, err := s.familyRepo.CreateFamily(ctx, newFamily)
+				if err != nil {
+					return nil, fmt.Errorf("创建父母婚姻关系失败: %v", err)
+				}
+			}
+		}
+	} else if req.MotherID != nil {
+		// 如果只指定了母亲，验证母亲存在且为女性
+		mother, err := s.repo.GetIndividualByID(ctx, *req.MotherID)
+		if err != nil {
+			return nil, fmt.Errorf("母亲不存在")
+		}
+		if mother.Gender != models.GenderFemale {
+			return nil, fmt.Errorf("指定的母亲必须是女性")
+		}
+	}
+
+	// 创建个人信息
+	individual := &models.Individual{
+		FullName:     req.FullName,
+		Gender:       req.Gender,
+		BirthDate:    req.BirthDate,
+		BirthPlace:   req.BirthPlace,
+		BirthPlaceID: req.BirthPlaceID,
+		DeathDate:    req.DeathDate,
+		DeathPlace:   req.DeathPlace,
+		BurialPlace:  req.BurialPlace,
+		DeathPlaceID: req.DeathPlaceID,
+		Occupation:   req.Occupation,
+		Notes:        req.Notes,
+		PhotoURL:     req.PhotoURL,
+		FatherID:     req.FatherID,
+		MotherID:     req.MotherID,
+		CreatedAt:    time.Now(),
+		UpdatedAt:    time.Now(),
+	}
+
+	createdIndividual, err := s.repo.CreateIndividualForUser(ctx, userID, individual)
+	if err != nil {
+		return nil, err
+	}
+
+	// 如果有父母，创建子女关系记录
+	if req.FatherID != nil && req.MotherID != nil {
+		// 查找父母的家庭关系
+		families, err := s.familyRepo.GetFamiliesByIndividualID(ctx, *req.FatherID)
+		if err == nil {
+			for _, family := range families {
+				if family.HusbandID != nil && *family.HusbandID == *req.FatherID &&
+					family.WifeID != nil && *family.WifeID == *req.MotherID {
+					// 创建子女关系记录
+					child := &models.Child{
+						FamilyID:              family.FamilyID,
+						IndividualID:          createdIndividual.IndividualID,
+						RelationshipToParents: "生子",
+					}
+					if createdIndividual.Gender == models.GenderFemale {
+						child.RelationshipToParents = "生女"
+					}
+
+					s.familyRepo.CreateChild(ctx, child)
+					break
+				}
+			}
+		}
+	}
+
+	return createdIndividual, nil
+}
+
 // GetByID 根据ID获取个人信息
 func (s *IndividualService) GetByID(ctx context.Context, id int) (*models.Individual, error) {
 	if id <= 0 {
@@ -487,6 +624,21 @@ func (s *IndividualService) Search(ctx context.Context, query string, limit, off
 	}
 
 	return s.repo.SearchIndividuals(ctx, query, limit, offset)
+}
+
+// SearchForUser 搜索个人信息（用户隔离版本）
+func (s *IndividualService) SearchForUser(ctx context.Context, userID int, query string, limit, offset int) ([]models.Individual, int, error) {
+	if limit <= 0 {
+		limit = 10
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	return s.repo.SearchIndividualsForUser(ctx, userID, query, limit, offset)
 }
 
 // GetChildren 获取个人的所有子女

@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self';">
     <title>家族树管理系统</title>
     <style>
         * {
@@ -107,6 +108,41 @@
 
         .search-result-item:hover {
             background: #f8f9fa;
+        }
+
+        /* 用户信息区域样式 */
+        .user-info-section {
+            display: flex;
+            align-items: center;
+        }
+
+        .user-info-content {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .user-greeting {
+            color: #333;
+            font-weight: 500;
+            font-size: 14px;
+        }
+
+        .logout-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .logout-btn:hover {
+            background: #c82333;
+            transform: translateY(-1px);
         }
 
         .main-container {
@@ -1020,6 +1056,132 @@
             gap: 0;
             width: 100%;
         }
+
+        /* 新用户欢迎界面样式 */
+        .new-user-welcome {
+            text-align: center;
+            padding: 60px 20px;
+            background: linear-gradient(135deg, #f8fdff 0%, #f0f9ff 100%);
+            border-radius: 15px;
+            border: 2px solid #e3f2fd;
+        }
+
+        .welcome-icon {
+            font-size: 4em;
+            margin-bottom: 20px;
+            animation: bounce 2s infinite;
+        }
+
+        @keyframes bounce {
+            0%, 20%, 50%, 80%, 100% {
+                transform: translateY(0);
+            }
+            40% {
+                transform: translateY(-10px);
+            }
+            60% {
+                transform: translateY(-5px);
+            }
+        }
+
+        .new-user-welcome h2 {
+            color: #2c5aa0;
+            font-size: 2em;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        .new-user-welcome p {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 40px;
+            line-height: 1.6;
+        }
+
+        .welcome-steps {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 40px;
+            flex-wrap: wrap;
+        }
+
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 15px;
+            max-width: 200px;
+            text-align: left;
+        }
+
+        .step-number {
+            background: #4CAF50;
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9em;
+            flex-shrink: 0;
+        }
+
+        .step-content h3 {
+            color: #333;
+            font-size: 1em;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+
+        .step-content p {
+            color: #666;
+            font-size: 0.85em;
+            line-height: 1.4;
+            margin: 0;
+        }
+
+        .welcome-actions {
+            margin-top: 20px;
+        }
+
+        .btn-large {
+            padding: 15px 30px;
+            font-size: 1.1em;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+            transition: all 0.3s;
+        }
+
+        .btn-large:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn-icon {
+            margin-right: 8px;
+            font-size: 1.2em;
+        }
+
+        @media (max-width: 768px) {
+            .welcome-steps {
+                flex-direction: column;
+                align-items: center;
+                gap: 20px;
+            }
+            
+            .step {
+                max-width: 300px;
+                text-align: center;
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .step-content {
+                text-align: center;
+            }
+        }
     </style>
 </head>
 <body>
@@ -1033,8 +1195,16 @@
             <!-- 搜索框 -->
             <div class="search-container">
                 <input type="text" class="search-input" id="searchInput" placeholder="搜索家族成员...">
-                <button class="search-btn" onclick="performSearch()">🔍</button>
+                <button class="search-btn" id="searchBtn">🔍</button>
                 <div class="search-results" id="searchResults"></div>
+            </div>
+            
+            <!-- 用户信息区域 -->
+            <div class="user-info-section" id="userInfoSection" style="display: none;">
+                <div class="user-info-content">
+                    <span class="user-greeting">👋 欢迎，<span id="currentUserName"></span></span>
+                    <button class="logout-btn" id="logoutBtn">退出登录</button>
+                </div>
             </div>
         </div>
     </div>
@@ -1087,7 +1257,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title" id="modalTitle">添加成员</div>
-                <span class="close" onclick="closeMemberModal()">&times;</span>
+                <span class="close" id="closeMemberModalBtn">&times;</span>
             </div>
             
             <form id="memberForm">
@@ -1147,7 +1317,7 @@
                 </div>
                 
                 <div class="form-actions">
-                    <button type="button" class="btn btn-secondary" onclick="closeMemberModal()">取消</button>
+                    <button type="button" class="btn btn-secondary" id="cancelMemberModalBtn">取消</button>
                     <button type="submit" class="btn btn-primary" id="submitBtn">保存</button>
                 </div>
             </form>
@@ -1159,7 +1329,7 @@
         <div class="modal-content">
             <div class="modal-header">
                 <div class="modal-title">成员详情</div>
-                <span class="close" onclick="closeDetailsModal()">&times;</span>
+                <span class="close" id="closeDetailsModalBtn">&times;</span>
             </div>
             <div id="detailsContent"></div>
         </div>
@@ -1175,12 +1345,100 @@
         let currentGenerations = 3;
         let selectedNodeId = null;
         let contextMenuNode = null;
+        let currentToken = null;
+        let currentUser = null;
 
         // 页面加载时初始化
         document.addEventListener('DOMContentLoaded', function() {
-            loadAllMembers();
-            initializeEventListeners();
+            initializeAuth();
         });
+
+        // 初始化认证
+        async function initializeAuth() {
+            // 检查本地存储中的token
+            currentToken = localStorage.getItem('authToken');
+            
+            if (!currentToken) {
+                // 没有token，跳转到登录页面
+                window.location.href = '/static/login.html';
+                return;
+            }
+
+            try {
+                // 验证token并获取用户信息
+                const response = await fetch('/api/v1/user/validate', {
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (response.status === 401) {
+                    // token无效，清除并跳转到登录页面
+                    localStorage.removeItem('authToken');
+                    window.location.href = '/static/login.html';
+                    return;
+                }
+
+                const data = await response.json();
+                
+                if (data.success) {
+                    currentUser = data.data.user;  // 注意这里的数据结构
+                    displayUserInfo();
+                    loadAllMembers();
+                    initializeEventListeners();
+                } else {
+                    // 获取用户信息失败，跳转到登录页面
+                    localStorage.removeItem('authToken');
+                    window.location.href = '/static/login.html';
+                }
+            } catch (error) {
+                console.error('认证失败:', error);
+                localStorage.removeItem('authToken');
+                window.location.href = '/static/login.html';
+            }
+        }
+
+        // 显示用户信息
+        function displayUserInfo() {
+            if (currentUser) {
+                document.getElementById('currentUserName').textContent = currentUser.full_name || currentUser.username;
+                document.getElementById('userInfoSection').style.display = 'block';
+            }
+        }
+
+        // 退出登录
+        function logout() {
+            localStorage.removeItem('authToken');
+            window.location.href = '/static/login.html';
+        }
+
+        // 带认证的fetch函数
+        async function authenticatedFetch(url, options = {}) {
+            const defaultHeaders = {
+                'Authorization': `Bearer ${currentToken}`,
+                'Content-Type': 'application/json'
+            };
+
+            const mergedOptions = {
+                ...options,
+                headers: {
+                    ...defaultHeaders,
+                    ...options.headers
+                }
+            };
+
+            const response = await fetch(url, mergedOptions);
+            
+            // 如果返回401，跳转到登录页面
+            if (response.status === 401) {
+                localStorage.removeItem('authToken');
+                window.location.href = '/static/login.html';
+                return;
+            }
+
+            return response;
+        }
 
         // 初始化事件监听器
         function initializeEventListeners() {
@@ -1256,7 +1514,17 @@
                     return; // 阻止后续处理
                 }
             
-            // 点击空白处关闭搜索结果和右键菜单
+            // 处理搜索结果点击
+                if (e.target.closest('.search-result-item')) {
+                    const resultItem = e.target.closest('.search-result-item');
+                    const memberId = parseInt(resultItem.dataset.memberId);
+                    if (memberId) {
+                        selectSearchResult(memberId);
+                    }
+                    return;
+                }
+
+                // 点击空白处关闭搜索结果和右键菜单
                 if (!e.target.closest('.search-container')) {
                     document.getElementById('searchResults').style.display = 'none';
                 }
@@ -1283,6 +1551,13 @@
 
             // 表单提交事件
             document.getElementById('memberForm').addEventListener('submit', handleFormSubmit);
+
+            // 添加新的事件监听器修复CSP问题
+            document.getElementById('searchBtn').addEventListener('click', performSearch);
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+            document.getElementById('closeMemberModalBtn').addEventListener('click', closeMemberModal);
+            document.getElementById('cancelMemberModalBtn').addEventListener('click', closeMemberModal);
+            document.getElementById('closeDetailsModalBtn').addEventListener('click', closeDetailsModal);
         }
 
         // 加载所有成员数据
@@ -1290,7 +1565,7 @@
             try {
                 // 添加时间戳参数避免缓存
                 const timestamp = new Date().getTime();
-                const response = await fetch(`/api/v1/individuals?_=${timestamp}`, {
+                const response = await authenticatedFetch(`/api/v1/individuals?_=${timestamp}`, {
                     headers: {
                         'Cache-Control': 'no-cache',
                         'Pragma': 'no-cache'
@@ -1312,6 +1587,9 @@
                                 showNotification('🎯 正在显示李富贵的一夫多妻家族树演示', 'success');
                             }, 1000);
                         }
+                    } else {
+                        // 新用户没有数据，显示欢迎界面
+                        showNewUserWelcome();
                     }
                 } else {
                     showNotification('加载成员数据失败', 'error');
@@ -1347,7 +1625,7 @@
                 container.innerHTML = '<div class="search-result-item">未找到匹配的成员</div>';
             } else {
                 container.innerHTML = results.map(member => `
-                    <div class="search-result-item ${member.individual_id === 12 ? 'polygamy-demo' : ''}" onclick="selectSearchResult(${member.individual_id})">
+                    <div class="search-result-item ${member.individual_id === 12 ? 'polygamy-demo' : ''}" data-member-id="${member.individual_id}">
                         <strong>${member.full_name}${member.individual_id === 12 ? ' 🔥一夫多妻演示' : ''}</strong>
                         <div style="font-size: 0.85em; color: #666;">
                             ${member.gender === 'male' ? '♂' : '♀'} 
@@ -1398,7 +1676,7 @@
             try {
                 // 获取家族树数据，添加时间戳避免缓存
                 const timestamp = new Date().getTime();
-                const response = await fetch(`/api/v1/individuals/${rootId}/family-tree?generations=${currentGenerations}&_=${timestamp}`, {
+                const response = await authenticatedFetch(`/api/v1/individuals/${rootId}/family-tree?generations=${currentGenerations}&_=${timestamp}`, {
                     headers: {
                         'Cache-Control': 'no-cache',
                         'Pragma': 'no-cache'
@@ -1409,11 +1687,17 @@
                 if (data.success && data.data) {
                     // 获取父母和配偶信息，添加时间戳避免缓存
                     const [parentsRes, spousesRes] = await Promise.all([
-                        fetch(`/api/v1/individuals/${rootId}/parents?_=${timestamp}`, {
-                            headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+                        authenticatedFetch(`/api/v1/individuals/${rootId}/parents?_=${timestamp}`, {
+                            headers: {
+                                'Cache-Control': 'no-cache', 
+                                'Pragma': 'no-cache'
+                            }
                         }),
-                        fetch(`/api/v1/individuals/${rootId}/spouses?_=${timestamp}`, {
-                            headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
+                        authenticatedFetch(`/api/v1/individuals/${rootId}/spouses?_=${timestamp}`, {
+                            headers: {
+                                'Cache-Control': 'no-cache', 
+                                'Pragma': 'no-cache'
+                            }
                         })
                     ]);
                     
@@ -1524,7 +1808,7 @@
                     
                     // 获取父母的配偶
                     try {
-                        const spousesResponse = await fetch(`/api/v1/individuals/${parent.individual_id}/spouses?_=${Date.now()}`, {
+                        const spousesResponse = await authenticatedFetch(`/api/v1/individuals/${parent.individual_id}/spouses?_=${Date.now()}`, {
                             headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
                         });
                         const spousesData = await spousesResponse.json();
@@ -1595,7 +1879,7 @@
                 
                 // 获取子女的配偶
                 try {
-                    const spousesResponse = await fetch(`/api/v1/individuals/${child.individual.individual_id}/spouses?_=${Date.now()}`, {
+                    const spousesResponse = await authenticatedFetch(`/api/v1/individuals/${child.individual.individual_id}/spouses?_=${Date.now()}`, {
                         headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
                     });
                     const spousesData = await spousesResponse.json();
@@ -2112,7 +2396,7 @@
                 
                 // 如果在allMembers中找不到，从API获取
                 if (!member) {
-                    const response = await fetch(`/api/v1/individuals/${memberId}?_=${Date.now()}`, {
+                    const response = await authenticatedFetch(`/api/v1/individuals/${memberId}?_=${Date.now()}`, {
                         headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
                     });
                     const data = await response.json();
@@ -2357,7 +2641,7 @@
                     const apiUrl = `/api/v1/individuals/${contextMenuNode}?_=${Date.now()}`;
                     console.log('API URL:', apiUrl);
                     
-                    const response = await fetch(apiUrl, {
+                    const response = await authenticatedFetch(apiUrl, {
                         headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
                     });
                     
@@ -2396,7 +2680,7 @@
             if (parentMember.gender === 'male') {
                 try {
                     console.log('正在获取配偶信息...');
-                    const spousesResponse = await fetch(`/api/v1/individuals/${contextMenuNode}/spouses?_=${Date.now()}`, {
+                    const spousesResponse = await authenticatedFetch(`/api/v1/individuals/${contextMenuNode}/spouses?_=${Date.now()}`, {
                         headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
                     });
                     const spousesData = await spousesResponse.json();
@@ -2803,7 +3087,7 @@
             }
             
             try {
-                const response = await fetch(`/api/v1/individuals/${contextMenuNode}`, {
+                const response = await authenticatedFetch(`/api/v1/individuals/${contextMenuNode}`, {
                     method: 'DELETE'
                 });
                 
@@ -2846,7 +3130,7 @@
                 
                 if (editingId) {
                     // 更新现有成员
-                    response = await fetch(`/api/v1/individuals/${editingId}`, {
+                    response = await authenticatedFetch(`/api/v1/individuals/${editingId}`, {
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json',
@@ -2857,7 +3141,7 @@
                     // 创建新成员
                     if (parentType === 'spouse' && contextMenuNode) {
                         // 先创建配偶成员
-                        const createResponse = await fetch('/api/v1/individuals', {
+                        const createResponse = await authenticatedFetch('/api/v1/individuals', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -2869,7 +3153,7 @@
                         
                         if (createData.success) {
                             // 创建配偶关系
-                            const spouseResponse = await fetch(`/api/v1/individuals/${contextMenuNode}/add-spouse`, {
+                            const spouseResponse = await authenticatedFetch(`/api/v1/individuals/${contextMenuNode}/add-spouse`, {
                                 method: 'POST',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -2911,7 +3195,7 @@
                                 console.log('添加子女 - 选择的母亲ID:', selectedWifeId);
                             } else {
                                 // 如果没有选择，尝试自动设置（兼容单妻子情况）
-                                const spousesResponse = await fetch(`/api/v1/individuals/${contextMenuNode}/spouses?_=${Date.now()}`, {
+                                const spousesResponse = await authenticatedFetch(`/api/v1/individuals/${contextMenuNode}/spouses?_=${Date.now()}`, {
                                     headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
                                 });
                                 const spousesData = await spousesResponse.json();
@@ -2928,7 +3212,7 @@
                         } else if (parentMember.gender === 'female') {
                             formData.mother_id = contextMenuNode;
                             // 如果母亲有配偶，自动设置父亲
-                            const spousesResponse = await fetch(`/api/v1/individuals/${contextMenuNode}/spouses?_=${Date.now()}`, {
+                            const spousesResponse = await authenticatedFetch(`/api/v1/individuals/${contextMenuNode}/spouses?_=${Date.now()}`, {
                                 headers: {'Cache-Control': 'no-cache', 'Pragma': 'no-cache'}
                             });
                             const spousesData = await spousesResponse.json();
@@ -2947,7 +3231,7 @@
                         console.log('添加父亲 - 子女ID:', contextMenuNode);
                         
                         // 先创建父亲
-                        const createResponse = await fetch('/api/v1/individuals', {
+                        const createResponse = await authenticatedFetch('/api/v1/individuals', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -2965,7 +3249,7 @@
                                 father_id: createData.data.individual_id
                             };
                             
-                            const updateResponse = await fetch(`/api/v1/individuals/${contextMenuNode}`, {
+                            const updateResponse = await authenticatedFetch(`/api/v1/individuals/${contextMenuNode}`, {
                                 method: 'PUT',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -2994,7 +3278,7 @@
                         console.log('添加母亲 - 子女ID:', contextMenuNode);
                         
                         // 先创建母亲
-                        const createResponse = await fetch('/api/v1/individuals', {
+                        const createResponse = await authenticatedFetch('/api/v1/individuals', {
                             method: 'POST',
                             headers: {
                                 'Content-Type': 'application/json',
@@ -3012,7 +3296,7 @@
                                 mother_id: createData.data.individual_id
                             };
                             
-                            const updateResponse = await fetch(`/api/v1/individuals/${contextMenuNode}`, {
+                            const updateResponse = await authenticatedFetch(`/api/v1/individuals/${contextMenuNode}`, {
                                 method: 'PUT',
                                 headers: {
                                     'Content-Type': 'application/json',
@@ -3038,7 +3322,7 @@
                         }
                     }
                     
-                    response = await fetch('/api/v1/individuals', {
+                    response = await authenticatedFetch('/api/v1/individuals', {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -3139,6 +3423,55 @@
             };
         }
 
+        // 显示新用户欢迎界面
+        function showNewUserWelcome() {
+            const container = document.getElementById('treeContainer');
+            const userName = currentUser ? currentUser.full_name || currentUser.username : '用户';
+            
+            const welcomeHtml = `
+                <div class="new-user-welcome">
+                    <div class="welcome-icon">🌳</div>
+                    <h2>欢迎来到家族树系统！</h2>
+                    <p>亲爱的 ${userName}，让我们开始构建您的家族树吧！</p>
+                    <div class="welcome-steps">
+                        <div class="step">
+                            <div class="step-number">1</div>
+                            <div class="step-content">
+                                <h3>添加第一位成员</h3>
+                                <p>通常建议从您自己开始，或从您的祖辈开始</p>
+                            </div>
+                        </div>
+                        <div class="step">
+                            <div class="step-number">2</div>
+                            <div class="step-content">
+                                <h3>添加家族关系</h3>
+                                <p>为成员添加父母、配偶和子女关系</p>
+                            </div>
+                        </div>
+                        <div class="step">
+                            <div class="step-number">3</div>
+                            <div class="step-content">
+                                <h3>完善信息</h3>
+                                <p>添加生日、职业、照片等详细信息</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="welcome-actions">
+                        <button class="btn btn-primary btn-large" onclick="showAddModal()">
+                            <span class="btn-icon">👤</span>
+                            创建第一位家族成员
+                        </button>
+                    </div>
+                </div>
+            `;
+            
+            container.innerHTML = welcomeHtml;
+            
+            // 更新头部标题
+            document.getElementById('currentRootName').textContent = '开始构建您的家族树';
+            document.getElementById('currentGenInfo').textContent = '';
+        }
+
         // 渲染传统族谱布局
         async function renderTraditionalFamilyLayout(rootData) {
             if (!rootData || !rootData.individual) {
@@ -3191,7 +3524,7 @@
             
             try {
                 // 获取家庭关系数据
-                const familiesResponse = await fetch(`/api/v1/families/husband/${rootData.individual.individual_id}`);
+                const familiesResponse = await authenticatedFetch(`/api/v1/families/husband/${rootData.individual.individual_id}`);
                 const familiesData = await familiesResponse.json();
                 const families = familiesData.success ? familiesData.data : [];
                 
@@ -3274,7 +3607,7 @@
                 
                 // 获取子女的配偶
                 try {
-                    const spousesResponse = await fetch(`/api/v1/individuals/${child.individual.individual_id}/spouses`);
+                    const spousesResponse = await authenticatedFetch(`/api/v1/individuals/${child.individual.individual_id}/spouses`);
                     const spousesData = await spousesResponse.json();
                     
                     if (spousesData.success && spousesData.data && spousesData.data.length > 0) {

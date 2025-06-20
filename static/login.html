@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self';">
+    <title>家族树系统 - 用户登录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            background: white;
+            padding: 2rem;
+            border-radius: 10px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo h1 {
+            color: #333;
+            font-size: 1.8rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .logo p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input[type="text"], input[type="email"], input[type="password"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid #e1e1e1;
+            border-radius: 5px;
+            font-size: 1rem;
+            transition: border-color 0.3s ease;
+        }
+
+        input[type="text"]:focus, input[type="email"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s ease;
+            margin-bottom: 1rem;
+        }
+
+        .btn:hover {
+            background: #5a6fd8;
+        }
+
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .switch-form {
+            text-align: center;
+            color: #666;
+        }
+
+        .switch-form a {
+            color: #667eea;
+            text-decoration: none;
+        }
+
+        .switch-form a:hover {
+            text-decoration: underline;
+        }
+
+        .message {
+            padding: 0.75rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+            text-align: center;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .user-info {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 5px;
+            margin-bottom: 1rem;
+        }
+
+        .user-info h3 {
+            color: #333;
+            margin-bottom: 0.5rem;
+        }
+
+        .user-info p {
+            color: #666;
+            margin-bottom: 0.25rem;
+        }
+
+        .family-trees {
+            margin-top: 1rem;
+        }
+
+        .family-tree-item {
+            background: white;
+            padding: 0.75rem;
+            border-radius: 5px;
+            margin-bottom: 0.5rem;
+            border: 1px solid #e1e1e1;
+        }
+
+        .family-tree-item h4 {
+            color: #333;
+            margin-bottom: 0.25rem;
+        }
+
+        .family-tree-item p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .default-badge {
+            background: #28a745;
+            color: white;
+            padding: 0.2rem 0.5rem;
+            border-radius: 3px;
+            font-size: 0.8rem;
+            margin-left: 0.5rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <div class="logo">
+            <h1>🌳 家族树系统</h1>
+            <p>记录您的家族历史</p>
+        </div>
+
+        <div id="message"></div>
+
+        <!-- 登录表单 -->
+        <div id="loginForm">
+            <form id="loginFormElement">
+                <div class="form-group">
+                    <label for="loginUsername">用户名/邮箱</label>
+                    <input type="text" id="loginUsername" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">密码</label>
+                    <input type="password" id="loginPassword" name="password" required>
+                </div>
+                <button type="submit" class="btn" id="loginBtn">登录</button>
+            </form>
+            <div class="switch-form">
+                没有账户？ <a href="#" id="showRegisterLink">立即注册</a>
+            </div>
+        </div>
+
+        <!-- 注册表单 -->
+        <div id="registerForm" style="display: none;">
+            <form id="registerFormElement">
+                <div class="form-group">
+                    <label for="registerUsername">用户名</label>
+                    <input type="text" id="registerUsername" name="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerEmail">邮箱</label>
+                    <input type="email" id="registerEmail" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerFullName">姓名</label>
+                    <input type="text" id="registerFullName" name="full_name" required>
+                </div>
+                <div class="form-group">
+                    <label for="registerPassword">密码</label>
+                    <input type="password" id="registerPassword" name="password" required minlength="6">
+                </div>
+                <button type="submit" class="btn" id="registerBtn">注册</button>
+            </form>
+            <div class="switch-form">
+                已有账户？ <a href="#" id="showLoginLink">立即登录</a>
+            </div>
+        </div>
+
+        <!-- 用户信息 -->
+        <div id="userInfo" style="display: none;">
+            <div class="user-info">
+                <h3>欢迎回来！</h3>
+                <p><strong>用户名：</strong><span id="userName"></span></p>
+                <p><strong>邮箱：</strong><span id="userEmail"></span></p>
+                <p><strong>姓名：</strong><span id="userFullName"></span></p>
+            </div>
+            
+            <div class="family-trees">
+                <h3>我的家族树</h3>
+                <div id="familyTreesList"></div>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 1rem;">
+                <button class="btn" id="goToFamilyTreeBtn" style="background: #28a745;">
+                    📊 管理家族树
+                </button>
+                <button class="btn" id="logoutBtn" style="background: #dc3545;">
+                    退出登录
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api/v1';
+        let currentToken = localStorage.getItem('authToken');
+
+        // 页面加载时检查登录状态和绑定事件监听器
+        document.addEventListener('DOMContentLoaded', function() {
+            if (currentToken) {
+                validateToken();
+            }
+
+            // 绑定表单提交事件
+            document.getElementById('loginFormElement').addEventListener('submit', handleLogin);
+            document.getElementById('registerFormElement').addEventListener('submit', handleRegister);
+
+            // 绑定链接点击事件
+            document.getElementById('showRegisterLink').addEventListener('click', function(e) {
+                e.preventDefault();
+                showRegisterForm();
+            });
+            document.getElementById('showLoginLink').addEventListener('click', function(e) {
+                e.preventDefault();
+                showLoginForm();
+            });
+
+            // 绑定按钮点击事件
+            document.getElementById('goToFamilyTreeBtn').addEventListener('click', goToFamilyTree);
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+        });
+
+        function showMessage(text, type = 'info') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<div class="message ${type}">${text}</div>`;
+            setTimeout(() => {
+                messageDiv.innerHTML = '';
+            }, 5000);
+        }
+
+        function showLoginForm() {
+            document.getElementById('loginForm').style.display = 'block';
+            document.getElementById('registerForm').style.display = 'none';
+            document.getElementById('userInfo').style.display = 'none';
+        }
+
+        function showRegisterForm() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'block';
+            document.getElementById('userInfo').style.display = 'none';
+        }
+
+        function showUserInfo() {
+            document.getElementById('loginForm').style.display = 'none';
+            document.getElementById('registerForm').style.display = 'none';
+            document.getElementById('userInfo').style.display = 'block';
+        }
+
+        async function handleLogin(event) {
+            event.preventDefault();
+            const loginBtn = document.getElementById('loginBtn');
+            loginBtn.disabled = true;
+            loginBtn.textContent = '登录中...';
+
+            const formData = new FormData(event.target);
+            const loginData = {
+                username: formData.get('username'),
+                password: formData.get('password')
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(loginData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    currentToken = result.data.token;
+                    localStorage.setItem('authToken', currentToken);
+                    showMessage('登录成功！', 'success');
+                    loadUserInfo(result.data.user);
+                    showUserInfo();
+                } else {
+                    showMessage(result.message || '登录失败', 'error');
+                }
+            } catch (error) {
+                showMessage('网络错误，请重试', 'error');
+                console.error('Login error:', error);
+            } finally {
+                loginBtn.disabled = false;
+                loginBtn.textContent = '登录';
+            }
+        }
+
+        async function handleRegister(event) {
+            event.preventDefault();
+            const registerBtn = document.getElementById('registerBtn');
+            registerBtn.disabled = true;
+            registerBtn.textContent = '注册中...';
+
+            const formData = new FormData(event.target);
+            const registerData = {
+                username: formData.get('username'),
+                email: formData.get('email'),
+                full_name: formData.get('full_name'),
+                password: formData.get('password')
+            };
+
+            try {
+                const response = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(registerData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showMessage('注册成功！请登录', 'success');
+                    showLoginForm();
+                    // 自动填充用户名
+                    document.getElementById('loginUsername').value = registerData.username;
+                } else {
+                    showMessage(result.message || '注册失败', 'error');
+                }
+            } catch (error) {
+                showMessage('网络错误，请重试', 'error');
+                console.error('Register error:', error);
+            } finally {
+                registerBtn.disabled = false;
+                registerBtn.textContent = '注册';
+            }
+        }
+
+        async function validateToken() {
+            try {
+                const response = await fetch(`${API_BASE}/user/validate`, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${currentToken}`
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    loadUserInfo(result.data.user);
+                    showUserInfo();
+                } else {
+                    localStorage.removeItem('authToken');
+                    currentToken = null;
+                    showLoginForm();
+                }
+            } catch (error) {
+                localStorage.removeItem('authToken');
+                currentToken = null;
+                showLoginForm();
+            }
+        }
+
+        function loadUserInfo(user) {
+            document.getElementById('userName').textContent = user.username;
+            document.getElementById('userEmail').textContent = user.email;
+            document.getElementById('userFullName').textContent = user.full_name;
+            
+            // 这里可以加载用户的家族树信息
+            loadFamilyTrees();
+        }
+
+        async function loadFamilyTrees() {
+            // 注意：这个API还没有实现，这里只是示例
+            const familyTreesList = document.getElementById('familyTreesList');
+            familyTreesList.innerHTML = `
+                <div class="family-tree-item">
+                    <h4>我的家族树<span class="default-badge">默认</span></h4>
+                    <p>您的第一个家族树，开始记录您的家族历史吧！</p>
+                </div>
+            `;
+        }
+
+        function goToFamilyTree() {
+            // 跳转到家族树管理界面
+            window.location.href = '/static/index.html';
+        }
+
+        function logout() {
+            localStorage.removeItem('authToken');
+            currentToken = null;
+            showMessage('已退出登录', 'success');
+            showLoginForm();
+        }
+    </script>
+</body>
+</html> 

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"io/ioutil"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -53,6 +55,11 @@ func NewSQLiteRepository(dbPath string) (*SQLiteRepository, error) {
 	db.SetMaxOpenConns(repo.maxOpenConns)
 	db.SetMaxIdleConns(repo.maxIdleConns)
 	db.SetConnMaxLifetime(repo.connMaxLifetime)
+
+	// 检查并初始化数据库
+	if err := repo.initializeDatabase(); err != nil {
+		return nil, fmt.Errorf("初始化数据库失败: %v", err)
+	}
 
 	// 初始化预处理语句
 	if err := repo.initPreparedStatements(); err != nil {
@@ -334,6 +341,65 @@ func (r *SQLiteRepository) SearchIndividuals(ctx context.Context, query string, 
 	// 获取总数
 	var total int
 	err = r.db.QueryRowContext(ctx, "SELECT COUNT(*) FROM individuals WHERE full_name LIKE ? OR notes LIKE ?", searchPattern, searchPattern).Scan(&total)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	return individuals, total, nil
+}
+
+// SearchIndividualsForUser 搜索个人信息（用户隔离版本）
+func (r *SQLiteRepository) SearchIndividualsForUser(ctx context.Context, userID int, query string, limit, offset int) ([]models.Individual, int, error) {
+	searchPattern := "%" + query + "%"
+
+	// 用户隔离的查询语句
+	querySQL := `
+		SELECT individual_id, full_name, gender, birth_date, birth_place, birth_place_id,
+		       death_date, death_place, death_place_id, burial_place_id,
+		       occupation, notes, photo_url, father_id, mother_id, created_at, updated_at
+		FROM individuals 
+		WHERE user_id = ? AND (full_name LIKE ? OR notes LIKE ?)
+		LIMIT ? OFFSET ?
+	`
+
+	rows, err := r.db.QueryContext(ctx, querySQL, userID, searchPattern, searchPattern, limit, offset)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+
+	var individuals []models.Individual
+	for rows.Next() {
+		var individual models.Individual
+		err := rows.Scan(
+			&individual.IndividualID,
+			&individual.FullName,
+			&individual.Gender,
+			&individual.BirthDate,
+			&individual.BirthPlace,
+			&individual.BirthPlaceID,
+			&individual.DeathDate,
+			&individual.DeathPlace,
+			&individual.DeathPlaceID,
+			&individual.BurialPlaceID,
+			&individual.Occupation,
+			&individual.Notes,
+			&individual.PhotoURL,
+			&individual.FatherID,
+			&individual.MotherID,
+			&individual.CreatedAt,
+			&individual.UpdatedAt,
+		)
+		if err != nil {
+			return nil, 0, err
+		}
+		individuals = append(individuals, individual)
+	}
+
+	// 获取总数（用户隔离）
+	var total int
+	countSQL := "SELECT COUNT(*) FROM individuals WHERE user_id = ? AND (full_name LIKE ? OR notes LIKE ?)"
+	err = r.db.QueryRowContext(ctx, countSQL, userID, searchPattern, searchPattern).Scan(&total)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -850,4 +916,182 @@ func (r *SQLiteRepository) Close() error {
 	}
 	r.stmtCache.Unlock()
 	return r.db.Close()
+}
+
+// initializeDatabase 初始化数据库（创建表和示例数据）
+func (r *SQLiteRepository) initializeDatabase() error {
+	// 检查是否已经初始化（检查是否存在users表）
+	var count int
+	err := r.db.QueryRow("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='users'").Scan(&count)
+	if err != nil {
+		return fmt.Errorf("检查数据库表失败: %v", err)
+	}
+
+	// 如果users表已存在，说明数据库已初始化
+	if count > 0 {
+		return nil
+	}
+
+	// 读取SQL初始化脚本
+	sqlFile := filepath.Join("sql", "init.sql")
+	sqlContent, err := ioutil.ReadFile(sqlFile)
+	if err != nil {
+		return fmt.Errorf("读取SQL文件失败: %v", err)
+	}
+
+	fmt.Println("正在初始化数据库...")
+
+	// 预处理SQL：移除注释并规范化
+	sqlText := string(sqlContent)
+	lines := strings.Split(sqlText, "\n")
+	var cleanLines []string
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line != "" && !strings.HasPrefix(line, "--") {
+			cleanLines = append(cleanLines, line)
+		}
+	}
+	cleanSQL := strings.Join(cleanLines, " ")
+
+	// 智能分割SQL语句
+	statements := r.smartSplitSQL(cleanSQL)
+
+	for i, stmt := range statements {
+		stmt = strings.TrimSpace(stmt)
+		if stmt == "" {
+			continue
+		}
+
+		fmt.Printf("执行SQL语句 %d...\n", i+1)
+		_, err := r.db.Exec(stmt)
+		if err != nil {
+			return fmt.Errorf("执行SQL语句失败: %v\n语句: %s", err, stmt)
+		}
+	}
+
+	fmt.Println("✅ 数据库初始化完成")
+	return nil
+}
+
+// smartSplitSQL 智能分割SQL语句，正确处理触发器等复合语句
+func (r *SQLiteRepository) smartSplitSQL(sql string) []string {
+	var statements []string
+	var current strings.Builder
+	var inQuotes bool
+	var quoteChar rune
+	var triggerDepth int
+
+	words := strings.Fields(sql) // 按空格分割成单词
+
+	for i, word := range words {
+		// 检查引号状态
+		for _, char := range word {
+			if char == '\'' || char == '"' {
+				if !inQuotes {
+					inQuotes = true
+					quoteChar = char
+				} else if char == quoteChar {
+					inQuotes = false
+				}
+			}
+		}
+
+		current.WriteString(word)
+		current.WriteString(" ")
+
+		if !inQuotes {
+			upperWord := strings.ToUpper(word)
+
+			// 检测触发器开始
+			if upperWord == "TRIGGER" && i > 0 && strings.ToUpper(words[i-1]) == "CREATE" {
+				triggerDepth = 1
+			}
+
+			// 在触发器内部检测BEGIN
+			if triggerDepth > 0 && upperWord == "BEGIN" {
+				triggerDepth = 2
+			}
+
+			// 检测END
+			if triggerDepth > 0 && (upperWord == "END" || strings.HasSuffix(upperWord, "END;")) {
+				triggerDepth = 0
+				// 如果这是触发器的结尾，完成当前语句
+				if strings.HasSuffix(upperWord, ";") {
+					stmt := strings.TrimSpace(current.String())
+					if stmt != "" {
+						statements = append(statements, stmt)
+					}
+					current.Reset()
+				}
+			} else if triggerDepth == 0 && strings.HasSuffix(word, ";") {
+				// 普通语句结束
+				stmt := strings.TrimSpace(current.String())
+				if stmt != "" {
+					statements = append(statements, stmt)
+				}
+				current.Reset()
+			}
+		}
+	}
+
+	// 添加最后一个语句
+	if current.Len() > 0 {
+		stmt := strings.TrimSpace(current.String())
+		if stmt != "" {
+			statements = append(statements, stmt)
+		}
+	}
+
+	return statements
+}
+
+// CreateIndividualForUser 创建个人信息（用户隔离版本）
+func (r *SQLiteRepository) CreateIndividualForUser(ctx context.Context, userID int, individual *models.Individual) (*models.Individual, error) {
+	// 获取用户的默认家族树ID
+	var familyTreeID int = 1 // 默认值，可以后续扩展为真正获取用户的默认家族树
+
+	query := `
+		INSERT INTO individuals (
+			full_name, gender, birth_date, birth_place, birth_place_id,
+			death_date, death_place, death_place_id, burial_place_id,
+			occupation, notes, photo_url, father_id, mother_id, 
+			user_id, family_tree_id, created_at, updated_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`
+
+	now := time.Now()
+	individual.CreatedAt = now
+	individual.UpdatedAt = now
+
+	result, err := r.db.ExecContext(ctx, query,
+		individual.FullName,
+		individual.Gender,
+		individual.BirthDate,
+		individual.BirthPlace,
+		individual.BirthPlaceID,
+		individual.DeathDate,
+		individual.DeathPlace,
+		individual.DeathPlaceID,
+		individual.BurialPlaceID,
+		individual.Occupation,
+		individual.Notes,
+		individual.PhotoURL,
+		individual.FatherID,
+		individual.MotherID,
+		userID,
+		familyTreeID,
+		individual.CreatedAt,
+		individual.UpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	id, err := result.LastInsertId()
+	if err != nil {
+		return nil, err
+	}
+
+	individual.IndividualID = int(id)
+	return individual, nil
 }

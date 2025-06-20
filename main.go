@@ -179,6 +179,9 @@ func createSQLiteApp(cfg *config.Config, container *di.Container, workerPool *wo
 	// 创建服务层
 	baseIndividualService := services.NewIndividualService(repo, repo)
 	baseFamilyService := services.NewFamilyService(repo, repo)
+	userService := services.NewUserService(repo)
+	familyTreeService := services.NewFamilyTreeService(repo, repo, baseIndividualService)
+	authService := services.NewAuthService(repo, repo)
 
 	// 如果有缓存，使用缓存装饰器
 	var individualService interfaces.IndividualService
@@ -193,18 +196,23 @@ func createSQLiteApp(cfg *config.Config, container *di.Container, workerPool *wo
 	// 注册服务到容器
 	container.Register(individualService)
 	container.Register(baseFamilyService)
+	container.Register(userService)
+	container.Register(familyTreeService)
+	container.Register(authService)
 
 	// 创建处理器
 	individualHandler := handlers.NewIndividualHandler(individualService)
 	familyHandler := handlers.NewFamilyHandler(baseFamilyService)
+	authHandler := handlers.NewAuthHandler(authService, userService)
 	log.Println("✅ HTTP处理器已创建")
 
 	// 注册处理器到容器
 	container.Register(individualHandler)
 	container.Register(familyHandler)
+	container.Register(authHandler)
 
 	// 设置路由（集成高级中间件）
-	router := setupAdvancedRouter(individualHandler, familyHandler, cfg)
+	router := setupAdvancedRouter(individualHandler, familyHandler, authHandler, cfg)
 	log.Println("✅ 高级路由和中间件已配置")
 
 	// 构建最终的清理函数
@@ -224,7 +232,7 @@ func createSQLiteApp(cfg *config.Config, container *di.Container, workerPool *wo
 }
 
 // setupAdvancedRouter 设置带高级中间件的路由
-func setupAdvancedRouter(individualHandler *handlers.IndividualHandler, familyHandler *handlers.FamilyHandler, cfg *config.Config) *mux.Router {
+func setupAdvancedRouter(individualHandler *handlers.IndividualHandler, familyHandler *handlers.FamilyHandler, authHandler *handlers.AuthHandler, cfg *config.Config) *mux.Router {
 	router := mux.NewRouter()
 
 	// 添加中间件（使用Gorilla mux兼容的方式）
@@ -284,15 +292,36 @@ func setupAdvancedRouter(individualHandler *handlers.IndividualHandler, familyHa
 		return timeoutMiddleware(next)
 	})
 
-	// 个人信息路由
-	individuals := api.PathPrefix("/individuals").Subrouter()
+	// 认证路由（不需要认证的路由）
+	auth := api.PathPrefix("/auth").Subrouter()
+	auth.HandleFunc("/register", authHandler.Register).Methods("POST")
+	auth.HandleFunc("/login", authHandler.Login).Methods("POST")
+	auth.HandleFunc("/refresh", authHandler.RefreshToken).Methods("POST")
+	auth.HandleFunc("/logout", authHandler.Logout).Methods("POST")
+
+	// 需要认证的API路由
+	protectedAPI := api.PathPrefix("").Subrouter()
+	protectedAPI.Use(func(next http.Handler) http.Handler {
+		return middleware.AuthMiddleware(next)
+	})
+	log.Println("✅ 认证中间件已启用（仅限保护的API路由）")
+
+	// 用户资料路由（需要认证）
+	user := protectedAPI.PathPrefix("/user").Subrouter()
+	user.HandleFunc("/profile", authHandler.GetProfile).Methods("GET")
+	user.HandleFunc("/profile", authHandler.UpdateProfile).Methods("PUT")
+	user.HandleFunc("/password", authHandler.ChangePassword).Methods("PUT")
+	user.HandleFunc("/validate", authHandler.ValidateToken).Methods("GET")
+
+	// 个人信息路由（需要认证）
+	individuals := protectedAPI.PathPrefix("/individuals").Subrouter()
 	individuals.HandleFunc("", individualHandler.CreateIndividual).Methods("POST")
 	individuals.HandleFunc("", individualHandler.SearchIndividuals).Methods("GET")
 	individuals.HandleFunc("/{id:[0-9]+}", individualHandler.GetIndividual).Methods("GET")
 	individuals.HandleFunc("/{id:[0-9]+}", individualHandler.UpdateIndividual).Methods("PUT")
 	individuals.HandleFunc("/{id:[0-9]+}", individualHandler.DeleteIndividual).Methods("DELETE")
 
-	// 关系路由
+	// 关系路由（需要认证）
 	individuals.HandleFunc("/{id:[0-9]+}/children", individualHandler.GetChildren).Methods("GET")
 	individuals.HandleFunc("/{id:[0-9]+}/parents", individualHandler.GetParents).Methods("GET")
 	individuals.HandleFunc("/{id:[0-9]+}/siblings", individualHandler.GetSiblings).Methods("GET")
@@ -301,14 +330,14 @@ func setupAdvancedRouter(individualHandler *handlers.IndividualHandler, familyHa
 	individuals.HandleFunc("/{id:[0-9]+}/descendants", individualHandler.GetDescendants).Methods("GET")
 	individuals.HandleFunc("/{id:[0-9]+}/family-tree", individualHandler.GetFamilyTree).Methods("GET")
 
-	// 添加父母路由
+	// 添加父母路由（需要认证）
 	individuals.HandleFunc("/{id:[0-9]+}/parents", individualHandler.AddParent).Methods("POST")
 
-	// 配偶关系路由
+	// 配偶关系路由（需要认证）
 	individuals.HandleFunc("/{id:[0-9]+}/add-spouse", familyHandler.AddSpouse).Methods("POST")
 
-	// 家庭关系路由
-	families := api.PathPrefix("/families").Subrouter()
+	// 家庭关系路由（需要认证）
+	families := protectedAPI.PathPrefix("/families").Subrouter()
 	families.HandleFunc("", familyHandler.CreateFamily).Methods("POST")
 	families.HandleFunc("/{id:[0-9]+}", familyHandler.GetFamily).Methods("GET")
 	families.HandleFunc("/{id:[0-9]+}", familyHandler.UpdateFamily).Methods("PUT")
@@ -341,12 +370,9 @@ func setupAdvancedRouter(individualHandler *handlers.IndividualHandler, familyHa
 		log.Println("✅ 指标查看API已启用 (/api/v1/metrics)")
 	}
 
-	// 缓存管理API（如果启用了缓存）
+	// 缓存管理API（如果启用了缓存，需要认证）
 	if cfg.RedisEnabled && cfg.CacheEnabled {
-		cache := router.PathPrefix("/api/v1/cache").Subrouter()
-		cache.Use(func(next http.Handler) http.Handler {
-			return timeoutMiddleware(next)
-		})
+		cache := protectedAPI.PathPrefix("/cache").Subrouter()
 
 		// 清除所有缓存
 		cache.HandleFunc("/clear", func(w http.ResponseWriter, r *http.Request) {
